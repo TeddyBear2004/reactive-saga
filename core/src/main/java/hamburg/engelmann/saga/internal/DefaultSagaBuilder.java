@@ -116,6 +116,14 @@ public class DefaultSagaBuilder<I, O> implements SagaBuilder<I, O> {
         return new DefaultSagaBuilder<>(name, updated, outputHistory, outputClass, config);
     }
 
+    /** Returns a new builder with the retry spec applied to the most recently added transition. */
+    DefaultSagaBuilder<I, O> withLastTransitionRetry(reactor.util.retry.Retry retrySpec) {
+        List<SagaTransition<?, ?, ?>> updated = new ArrayList<>(transitions);
+        SagaTransition<?, ?, ?> last = updated.removeLast();
+        updated.add(last.withRetry(retrySpec));
+        return new DefaultSagaBuilder<>(name, updated, outputHistory, outputClass, config);
+    }
+
     @Override
     public <NI, NO, L> SagaStepBuilder<I, O> step(SagaStep<NI, NO, L> step) {
         InputResolver<NI> resolver = createResolver(step.inputType(), outputHistory);

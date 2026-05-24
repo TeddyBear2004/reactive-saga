@@ -10,6 +10,7 @@ import hamburg.engelmann.saga.lock.LockableResourceId;
 import hamburg.engelmann.saga.lock.SagaLockService;
 import hamburg.engelmann.saga.step.SagaStep;
 import org.jspecify.annotations.Nullable;
+import reactor.util.retry.Retry;
 
 import java.time.Duration;
 import java.util.List;
@@ -36,6 +37,16 @@ class DefaultSagaStepBuilder<I, O> implements SagaStepBuilder<I, O> {
     @Override
     public SagaBuilder<I, O> timeout(Duration stepTimeout) {
         return inner.withLastTransitionTimeout(stepTimeout);
+    }
+
+    @Override
+    public SagaStepBuilder<I, O> retryable(int maxAttempts) {
+        return new DefaultSagaStepBuilder<>(inner.withLastTransitionRetry(Retry.max(maxAttempts)));
+    }
+
+    @Override
+    public SagaStepBuilder<I, O> retryable(int maxAttempts, Duration fixedDelay) {
+        return new DefaultSagaStepBuilder<>(inner.withLastTransitionRetry(Retry.fixedDelay(maxAttempts, fixedDelay)));
     }
 
     // All SagaBuilder methods delegate to inner:

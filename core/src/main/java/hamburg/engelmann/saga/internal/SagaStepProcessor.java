@@ -32,11 +32,13 @@ class SagaStepProcessor {
         log.debug("[Saga:{}] Executing step: {}", sagaTraceId, transition.stepName());
         if (obs != null) obs.onStepStarted(sagaName, transition.stepName());
 
-        Mono<StepResult<Object, Object>> stepMono =
-                transition.executeValidated(currentInput, context.getExecutionOutputs());
+        Mono<StepResult<Object, Object>> stepMono = Mono.defer(
+                () -> transition.executeValidated(currentInput, context.getExecutionOutputs()));
 
         Duration stepTimeout = transition.timeout();
         if (stepTimeout != null) stepMono = stepMono.timeout(stepTimeout);
+
+        if (transition.retrySpec() != null) stepMono = stepMono.retryWhen(transition.retrySpec());
 
         return stepMono
                 .doOnNext(result -> handleSuccess(result, context))
