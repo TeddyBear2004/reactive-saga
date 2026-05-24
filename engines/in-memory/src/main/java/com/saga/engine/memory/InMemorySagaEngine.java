@@ -1,4 +1,4 @@
-package com.saga.internal;
+package com.saga.engine.memory;
 
 import com.saga.Saga;
 import com.saga.SagaBuilder;
@@ -11,7 +11,20 @@ import org.jspecify.annotations.Nullable;
  * Stateless, in-memory {@link SagaEngine} implementation.
  * Execution state lives entirely in the reactive chain — no persistence across calls.
  *
- * <p>Obtain via {@link SagaEngine#inMemory()}.
+ * <p>This is the default engine for most applications. Use
+ * {@link com.saga.engine.persistent.PersistentSagaEngine} when crash-recovery or
+ * durable distributed execution is required.
+ *
+ * <p>Typical usage:
+ * <pre>{@code
+ * SagaEngine engine = InMemorySagaEngine.create();
+ *
+ * Saga<Order, Receipt> saga = engine.build(
+ *         Saga.builder("OrderFlow", Order.class, Receipt.class)
+ *                 .step(new ValidateOrderStep())
+ *                 .step(new ReserveInventoryStep())
+ * );
+ * }</pre>
  */
 public final class InMemorySagaEngine implements SagaEngine {
 
@@ -22,6 +35,11 @@ public final class InMemorySagaEngine implements SagaEngine {
                                @Nullable SagaLockService lockService) {
         this.observer = observer;
         this.lockService = lockService;
+    }
+
+    /** Creates a new stateless, unconfigured in-memory engine. */
+    public static InMemorySagaEngine create() {
+        return new InMemorySagaEngine(null, null);
     }
 
     @Override

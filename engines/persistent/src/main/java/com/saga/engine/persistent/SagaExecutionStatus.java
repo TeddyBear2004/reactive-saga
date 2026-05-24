@@ -1,4 +1,4 @@
-package com.saga.persistent;
+package com.saga.engine.persistent;
 
 /** Lifecycle status of a persistent saga execution. */
 public enum SagaExecutionStatus {

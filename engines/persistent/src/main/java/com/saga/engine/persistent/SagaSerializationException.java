@@ -1,4 +1,4 @@
-package com.saga.persistent;
+package com.saga.engine.persistent;
 
 /**
  * Thrown when a step output cannot be serialized or deserialized by a {@link SagaStateSerializer}.

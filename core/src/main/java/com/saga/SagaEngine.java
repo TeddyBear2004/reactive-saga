@@ -1,6 +1,5 @@
 package com.saga;
 
-import com.saga.internal.InMemorySagaEngine;
 import com.saga.lifecycle.SagaLifecycleObserver;
 import com.saga.lock.SagaLockService;
 
@@ -10,7 +9,7 @@ import com.saga.lock.SagaLockService;
  *
  * <p>Typical usage:
  * <pre>{@code
- * SagaEngine engine = SagaEngine.inMemory()
+ * SagaEngine engine = InMemorySagaEngine.create()
  *         .withObserver(metricsObserver)
  *         .withLockService(lockService);
  *
@@ -23,6 +22,9 @@ import com.saga.lock.SagaLockService;
  *
  * <p>Engine-level configuration (observer, lock service) is applied to every {@link Saga} built from
  * the engine, and overrides any equivalent settings on the builder.
+ *
+ * @see com.saga.engine.memory.InMemorySagaEngine
+ * @see com.saga.engine.persistent.PersistentSagaEngine
  */
 public interface SagaEngine {
 
@@ -43,10 +45,5 @@ public interface SagaEngine {
      * and shared configuration (observer, lock service).
      */
     <I, O> Saga<I, O> build(SagaBuilder<I, O> builder);
-
-    /** Creates a stateless, in-memory saga engine (the default strategy). */
-    static SagaEngine inMemory() {
-        return new InMemorySagaEngine(null, null);
-    }
 
 }

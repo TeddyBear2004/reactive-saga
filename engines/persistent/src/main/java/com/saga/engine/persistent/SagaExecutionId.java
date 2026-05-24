@@ -1,4 +1,4 @@
-package com.saga.persistent;
+package com.saga.engine.persistent;
 
 /**
  * Uniquely identifies a single saga execution instance.

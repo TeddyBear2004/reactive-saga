@@ -1,4 +1,4 @@
-package com.saga.persistent;
+package com.saga.engine.persistent;
 
 import com.saga.Saga;
 import com.saga.SagaBuilder;
