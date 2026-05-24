@@ -1,19 +1,34 @@
 package com.saga.internal;
 
 import com.saga.step.SagaStep;
+import org.jspecify.annotations.Nullable;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.util.List;
 
 public class SagaTransition<I, O, L> {
 
     private final SagaStep<I, O, L> step;
     private final InputResolver<I> inputResolver;
+    private final @Nullable Duration timeout;
 
     public SagaTransition(SagaStep<I, O, L> step, InputResolver<I> inputResolver) {
+        this(step, inputResolver, null);
+    }
+
+    public SagaTransition(SagaStep<I, O, L> step, InputResolver<I> inputResolver,
+                          @Nullable Duration timeout) {
         this.step = step;
         this.inputResolver = inputResolver;
+        this.timeout = timeout;
     }
+
+    SagaTransition<I, O, L> withTimeout(Duration t) {
+        return new SagaTransition<>(step, inputResolver, t);
+    }
+
+    @Nullable Duration timeout() { return timeout; }
 
     String stepName() { return step.name(); }
 

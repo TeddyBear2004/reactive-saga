@@ -9,6 +9,7 @@ import com.saga.lock.SagaLockService;
 import org.jspecify.annotations.Nullable;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.function.Function;
 
@@ -22,6 +23,7 @@ public class SagaImpl<I, O> implements Saga<I, O> {
     private final SagaExecution<I, O> execution;
     private final @Nullable Function<I, List<LockableResourceId>> lockResourcesExtractor;
     private final @Nullable SagaLockService sagaLockService;
+    private final @Nullable Duration sagaTimeout;
 
     public SagaImpl(String name,
                     List<SagaTransition<?, ?, ?>> transitions,
@@ -31,17 +33,21 @@ public class SagaImpl<I, O> implements Saga<I, O> {
                     @Nullable Function<I, List<LockableResourceId>> lockResourcesExtractor,
                     @Nullable SagaLockService sagaLockService,
                     @Nullable Function<I, String> correlationIdExtractor,
-                    @Nullable SagaPersistenceHook persistenceHook) {
+                    @Nullable SagaPersistenceHook persistenceHook,
+                    @Nullable Duration sagaTimeout) {
         this.observer = observer;
         this.execution = new SagaExecution<>(name, transitions, finalOutputResolver, outputClass,
                                              correlationIdExtractor, persistenceHook);
         this.lockResourcesExtractor = lockResourcesExtractor;
         this.sagaLockService = sagaLockService;
+        this.sagaTimeout = sagaTimeout;
     }
 
     @Override
     public Mono<O> execute(I initialPayload) {
-        return wrapWithLock(initialPayload, execution.execute(initialPayload, this.observer));
+        Mono<O> mono = execution.execute(initialPayload, this.observer);
+        if (sagaTimeout != null) mono = mono.timeout(sagaTimeout);
+        return wrapWithLock(initialPayload, mono);
     }
 
     @Override
@@ -49,7 +55,9 @@ public class SagaImpl<I, O> implements Saga<I, O> {
         SagaLifecycleObserver combined = (this.observer != null)
                 ? SagaLifecycleObserver.combine(this.observer, additionalObserver)
                 : additionalObserver;
-        return wrapWithLock(initialPayload, execution.execute(initialPayload, combined));
+        Mono<O> mono = execution.execute(initialPayload, combined);
+        if (sagaTimeout != null) mono = mono.timeout(sagaTimeout);
+        return wrapWithLock(initialPayload, mono);
     }
 
     private Mono<O> wrapWithLock(I input, Mono<O> mono) {

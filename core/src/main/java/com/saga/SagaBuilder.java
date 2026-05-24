@@ -6,6 +6,7 @@ import com.saga.lock.SagaLockService;
 import com.saga.step.SagaStep;
 import org.jspecify.annotations.Nullable;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.function.Function;
 
@@ -41,11 +42,32 @@ public interface SagaBuilder<I, O> {
      */
     SagaBuilder<I, O> withPersistenceHook(SagaPersistenceHook hook);
 
-    <NI, NO, L> SagaBuilder<I, O> step(SagaStep<NI, NO, L> step);
+    /**
+     * Sets a timeout for the entire saga execution.
+     * If the saga does not complete within this duration, a {@link java.util.concurrent.TimeoutException}
+     * is propagated and compensation is triggered.
+     *
+     * @param sagaTimeout maximum duration for the whole saga
+     */
+    SagaBuilder<I, O> timeout(Duration sagaTimeout);
 
-    SagaBuilder<I, O> parallel(String groupName, SagaStep<?, ?, ?>... subSteps);
+    /**
+     * Adds a step to the saga and returns a {@link SagaStepBuilder} that allows setting a
+     * per-step timeout via {@link SagaStepBuilder#timeout}.
+     */
+    <NI, NO, L> SagaStepBuilder<I, O> step(SagaStep<NI, NO, L> step);
 
-    SagaBuilder<I, O> parallel(String groupName, List<SagaStep<?, ?, ?>> subSteps);
+    /**
+     * Adds a parallel step group and returns a {@link SagaStepBuilder} that allows setting a
+     * per-group timeout via {@link SagaStepBuilder#timeout}.
+     */
+    SagaStepBuilder<I, O> parallel(String groupName, SagaStep<?, ?, ?>... subSteps);
+
+    /**
+     * Adds a parallel step group and returns a {@link SagaStepBuilder} that allows setting a
+     * per-group timeout via {@link SagaStepBuilder#timeout}.
+     */
+    SagaStepBuilder<I, O> parallel(String groupName, List<SagaStep<?, ?, ?>> subSteps);
 
     SagaBuilder<I, O> injectProperties(Object properties);
 
