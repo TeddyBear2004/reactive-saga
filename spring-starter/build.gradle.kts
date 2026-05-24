@@ -8,6 +8,10 @@ plugins {
 dependencies {
     api(project(":core"))
     implementation(project(":engines:in-memory"))
+    // Optional — enables PersistentSagaAutoConfiguration when on the classpath
+    compileOnly(project(":engines:persistent"))
+    // Optional — enables Jackson-based SagaStateSerializer auto-configuration
+    compileOnly("com.fasterxml.jackson.core:jackson-databind")
     implementation("org.springframework.boot:spring-boot-autoconfigure")
     annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
 

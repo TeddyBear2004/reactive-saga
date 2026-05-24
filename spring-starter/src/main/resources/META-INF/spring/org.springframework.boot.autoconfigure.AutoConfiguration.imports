@@ -1,1 +1,2 @@
+com.saga.spring.PersistentSagaAutoConfiguration
 com.saga.spring.SagaAutoConfiguration

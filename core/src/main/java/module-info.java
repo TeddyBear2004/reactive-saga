@@ -3,6 +3,7 @@ module com.saga.core {
     requires org.slf4j;
     requires static org.jspecify;
     requires static lombok;
+    requires org.reactivestreams;
 
     exports com.saga;
     exports com.saga.step;
