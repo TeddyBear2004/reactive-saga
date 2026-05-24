@@ -14,6 +14,8 @@ dependencies {
     compileOnly(libs.lombok)
     annotationProcessor(libs.lombok)
 
+    testImplementation(libs.reactor.test)
     testImplementation("org.junit.jupiter:junit-jupiter")
+    testImplementation("org.assertj:assertj-core")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }

@@ -29,8 +29,19 @@ public class SagaProxyFactory {
         return Proxy.newProxyInstance(
                 inputType.getClassLoader(),
                 new Class[]{inputType},
-                (_, method, _) -> {
+                (proxy, method, args) -> {
+                    if (method.getDeclaringClass() == Object.class) {
+                        return switch (method.getName()) {
+                            case "toString" -> "Proxy<" + inputType.getSimpleName() + ">";
+                            case "hashCode" -> System.identityHashCode(proxy);
+                            case "equals" -> proxy == (args != null && args.length > 0 ? args[0] : null);
+                            default -> method.invoke(proxy, args);
+                        };
+                    }
                     SagaInputMapper.OutputLocator loc = mapping.get(method.getName());
+                    if (loc == null) {
+                        throw new UnsupportedOperationException("No mapping for method: " + method.getName());
+                    }
                     Object target = outputs.get(loc.stepIndex());
                     return loc.accessor() == null ? target : loc.accessor().invoke(target);
                 }
@@ -49,6 +60,7 @@ public class SagaProxyFactory {
                 types[i] = components[i].getType();
             }
             Constructor<?> ctor = inputType.getDeclaredConstructor(types);
+            ctor.setAccessible(true);
             return ctor.newInstance(args);
         } catch (Exception e) {
             throw new RuntimeException("Failed to instantiate record: " + inputType.getName(), e);

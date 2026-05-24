@@ -12,6 +12,4 @@ public interface SagaLockRepository {
 
     Flux<SagaLock> findBySagaId(UUID sagaId);
 
-    Flux<SagaLock> findByResourceTypeAndResourceIdAndStatus(String resourceType, String resourceId, SagaLockStatus status);
-
 }

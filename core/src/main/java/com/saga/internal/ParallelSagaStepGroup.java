@@ -21,8 +21,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class ParallelSagaStepGroup implements SagaStep<Object, ParallelOutputs, Map<String, Object>> {
 
     private static final Logger log = LoggerFactory.getLogger(ParallelSagaStepGroup.class);
-    private static final int MAX_CONCURRENCY = 256;
-    private static final int PREFETCH = 32;
 
     private final String name;
     private final List<ParallelMember<?, ?, ?>> members;
@@ -47,7 +45,7 @@ public class ParallelSagaStepGroup implements SagaStep<Object, ParallelOutputs, 
         List<ParallelMember<?, ?, ?>> completedMembers = new CopyOnWriteArrayList<>();
 
         return Flux.fromIterable(members)
-                .flatMapSequentialDelayError(member -> {
+                .concatMap(member -> {
                     log.debug("[ParallelSagaStepGroup:{}] Starting sub-step: {}", name, member.step().name());
                     return member.executeWithInjection(history)
                             .doOnSuccess(result -> {
@@ -57,7 +55,7 @@ public class ParallelSagaStepGroup implements SagaStep<Object, ParallelOutputs, 
                                 completedMembers.add(member);
                             })
                             .map(result -> result.output() != null ? result.output() : new Object());
-                }, MAX_CONCURRENCY, PREFETCH)
+                })
                 .collectList()
                 .map(outputs -> new StepResult<>(new ParallelOutputs(outputs), localStates))
                 .onErrorResume(error -> compensatePartial(completedMembers, localStates, error));
@@ -81,7 +79,7 @@ public class ParallelSagaStepGroup implements SagaStep<Object, ParallelOutputs, 
     private Mono<Void> executeParallelCompensation(
             Iterable<? extends ParallelMember<?, ?, ?>> toCompensate, Map<String, Object> states) {
         return Flux.fromIterable(toCompensate)
-                .flatMapDelayError(member -> {
+                .concatMap(member -> {
                     log.debug("[ParallelSagaStepGroup:{}] Compensating step: {}", name, member.step().name());
                     return ((SagaStep<Object, Object, Object>) member.step())
                             .compensate(states.get(member.step().name()))
@@ -90,7 +88,7 @@ public class ParallelSagaStepGroup implements SagaStep<Object, ParallelOutputs, 
                                           name, member.step().name(), err.getMessage());
                                 return Mono.empty();
                             });
-                }, MAX_CONCURRENCY, PREFETCH)
+                })
                 .then();
     }
 

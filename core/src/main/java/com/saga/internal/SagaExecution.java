@@ -1,7 +1,6 @@
 package com.saga.internal;
 
 import com.saga.SagaPersistenceHook;
-import com.saga.SagaResumePoint;
 import com.saga.lifecycle.SagaLifecycleObserver;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -17,6 +16,8 @@ import java.util.function.Function;
 class SagaExecution<I, O> {
 
     private static final Logger log = LoggerFactory.getLogger(SagaExecution.class);
+    /** Sentinel for null initial payloads (Void sagas) so Mono.just() never receives null. */
+    private static final Object CHAIN_SENTINEL = new Object();
 
     private final String name;
     private final List<SagaTransition<?, ?, ?>> transitions;
@@ -58,9 +59,9 @@ class SagaExecution<I, O> {
                 int startIndex = context.getCompletedTransitions();
                 // The chain starts from the last preloaded output (or the initial payload).
                 List<Object> outputs = context.getExecutionOutputs();
-                Object startValue = outputs.get(outputs.size() - 1);
+                Object startValue = outputs.getLast();
 
-                Mono<Object> chain = Mono.just(startValue);
+                Mono<Object> chain = Mono.just(startValue != null ? startValue : CHAIN_SENTINEL);
 
                 for (int i = 0; i < transitions.size(); i++) {
                     final int transitionIndex = i;
@@ -94,12 +95,15 @@ class SagaExecution<I, O> {
                         .onErrorResume(err -> {
                             Mono<Object> compensated = compensator.compensate(context, err, obs);
                             if (persistenceHook == null) return compensated;
-                            return compensated.then(persistenceHook.onFailed(name, correlationId))
-                                    .then(Mono.error(err));
+                            // compensated always terminates with an error, so use onErrorResume
+                            // to call onFailed before re-propagating the compensation error.
+                            return compensated.onErrorResume(compensationErr ->
+                                    persistenceHook.onFailed(name, correlationId)
+                                            .then(Mono.error(compensationErr)));
                         })
                         .doOnSuccess(_ -> log.info("[Saga:{}] Completed successfully in {}ms. correlationId={}",
                                                    name, start.until(Instant.now()).toMillis(), correlationId))
-                        .mapNotNull(_ -> finalOutputResolver.resolve(null, context.getExecutionOutputs()))
+                        .mapNotNull(chainValue -> finalOutputResolver.resolve(chainValue, context.getExecutionOutputs()))
                         .cast(outputClass)
                         .flatMap(finalOutput -> {
                             if (obs != null) obs.onSagaCompleted(name);

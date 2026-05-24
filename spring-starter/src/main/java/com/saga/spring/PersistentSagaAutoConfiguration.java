@@ -30,7 +30,8 @@ import org.springframework.context.annotation.Bean;
  * <p>If no {@link SagaStateSerializer} bean is provided, one is auto-registered using the
  * application context's {@link ObjectMapper} with FQCN type info (requires Jackson to be present).
  *
- * <p>Example minimal setup:
+ * <p>{@link SagaExecutionRepository} is an infrastructure port — the application must provide
+ * an implementation for its chosen datastore (e.g. R2DBC, MongoDB, Redis):
  * <pre>{@code
  * @Bean
  * public SagaExecutionRepository sagaExecutionRepository(MyDataStore store) {

@@ -31,7 +31,7 @@ class SagaStepProcessor {
         if (obs != null) obs.onStepStarted(sagaName, transition.stepName());
 
         return transition.executeValidated(currentInput, context.getExecutionOutputs())
-                .doOnSuccess(result -> handleSuccess(result, context))
+                .doOnNext(result -> handleSuccess(result, context))
                 .doOnError(this::handleError)
                 .flatMap(this::extractOutput);
     }

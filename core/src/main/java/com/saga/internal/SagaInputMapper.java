@@ -43,9 +43,11 @@ public class SagaInputMapper {
             if (cls.isRecord()) {
                 for (RecordComponent rc : cls.getRecordComponents()) {
                     if (rc.getName().equals(targetName) && targetType.isAssignableFrom(rc.getType())) {
-                        matches.add(new MatchResult(new OutputLocator(i, rc.getAccessor()),
+                        Method accessor = rc.getAccessor();
+                        accessor.setAccessible(true);
+                        matches.add(new MatchResult(new OutputLocator(i, accessor),
                                                     "Record '" + rc.getName() + "' in " + cls.getSimpleName()));
-                        seen.add(rc.getAccessor());
+                        seen.add(accessor);
                     }
                 }
             } else {
@@ -56,6 +58,7 @@ public class SagaInputMapper {
                     boolean match = mn.equals(targetName) || mn.equals(getter)
                                     || ((targetType == boolean.class || targetType == Boolean.class) && mn.equals(isGetter));
                     if (match) {
+                        m.setAccessible(true);
                         matches.add(new MatchResult(new OutputLocator(i, m), "Method '" + mn + "()' in " + cls.getSimpleName()));
                     }
                 }

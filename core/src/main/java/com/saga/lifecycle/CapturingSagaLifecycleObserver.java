@@ -1,5 +1,6 @@
 package com.saga.lifecycle;
 
+import com.saga.internal.DefaultCapturingSagaLifecycleObserver;
 import com.saga.step.SagaCompensationException;
 
 import java.util.List;
@@ -25,6 +26,8 @@ public interface CapturingSagaLifecycleObserver extends SagaLifecycleObserver {
 
     List<String> getStartedSagas();
 
+    List<StepEvent> getStartedSteps();
+
     List<StepEvent> getCompletedSteps();
 
     List<StepErrorEvent> getFailedSteps();
@@ -44,7 +47,7 @@ public interface CapturingSagaLifecycleObserver extends SagaLifecycleObserver {
     void reset();
 
     static CapturingSagaLifecycleObserver create() {
-        return new com.saga.internal.DefaultCapturingSagaLifecycleObserver();
+        return new DefaultCapturingSagaLifecycleObserver();
     }
 
 }

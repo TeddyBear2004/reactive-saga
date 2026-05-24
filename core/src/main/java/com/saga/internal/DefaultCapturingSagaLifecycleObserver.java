@@ -14,6 +14,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class DefaultCapturingSagaLifecycleObserver implements CapturingSagaLifecycleObserver {
 
     private final List<String> startedSagas = new CopyOnWriteArrayList<>();
+    private final List<StepEvent> startedSteps = new CopyOnWriteArrayList<>();
     private final List<StepEvent> completedSteps = new CopyOnWriteArrayList<>();
     private final List<StepErrorEvent> failedSteps = new CopyOnWriteArrayList<>();
     private final List<SagaErrorEvent> errors = new CopyOnWriteArrayList<>();
@@ -22,6 +23,7 @@ public class DefaultCapturingSagaLifecycleObserver implements CapturingSagaLifec
     private final List<SagaCompensationException> compensationFailures = new CopyOnWriteArrayList<>();
 
     @Override public void onSagaStarted(String s) { startedSagas.add(s); }
+    @Override public void onStepStarted(String s, String n) { startedSteps.add(new StepEvent(s, n)); }
     @Override public void onStepCompleted(String s, String n) { completedSteps.add(new StepEvent(s, n)); }
     @Override public void onStepFailed(String s, String n, Throwable e) { failedSteps.add(new StepErrorEvent(s, n, e)); }
     @Override public void onError(String s, Throwable e) { errors.add(new SagaErrorEvent(s, e)); }
@@ -30,6 +32,7 @@ public class DefaultCapturingSagaLifecycleObserver implements CapturingSagaLifec
     @Override public void onCompensationFailed(String s, SagaCompensationException e) { compensationFailures.add(e); }
 
     @Override public List<String> getStartedSagas() { return Collections.unmodifiableList(startedSagas); }
+    @Override public List<StepEvent> getStartedSteps() { return Collections.unmodifiableList(startedSteps); }
     @Override public List<StepEvent> getCompletedSteps() { return Collections.unmodifiableList(completedSteps); }
     @Override public List<StepErrorEvent> getFailedSteps() { return Collections.unmodifiableList(failedSteps); }
     @Override public List<SagaErrorEvent> getErrors() { return Collections.unmodifiableList(errors); }
@@ -41,7 +44,7 @@ public class DefaultCapturingSagaLifecycleObserver implements CapturingSagaLifec
 
     @Override
     public void reset() {
-        startedSagas.clear(); completedSteps.clear(); failedSteps.clear();
+        startedSagas.clear(); startedSteps.clear(); completedSteps.clear(); failedSteps.clear();
         errors.clear(); completedSagas.clear(); compensatedSagas.clear(); compensationFailures.clear();
     }
 }

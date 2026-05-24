@@ -16,6 +16,7 @@ dependencies {
 
     testImplementation(libs.reactor.test)
     testImplementation("org.junit.jupiter:junit-jupiter")
+    testImplementation("org.assertj:assertj-core")
     testImplementation("ch.qos.logback:logback-classic")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }

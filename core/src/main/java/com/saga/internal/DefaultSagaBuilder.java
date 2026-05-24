@@ -131,6 +131,7 @@ public class DefaultSagaBuilder<I, O> implements SagaBuilder<I, O> {
 
     private <T> InputResolver<T> createResolver(Class<T> type, List<Class<?>> history) {
         if (type == Void.class) return InputResolvers.voidResolver();
+        if (!history.isEmpty() && history.getLast() == type) return InputResolvers.directResolver();
         if (type.isInterface() || type.isRecord()) {
             return InputResolvers.proxyResolver(new SagaProxyFactory(type, SagaInputMapper.buildMapping(type, history)));
         }
