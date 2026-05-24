@@ -1,6 +1,11 @@
 // Pure saga engine — no Spring, no framework dependencies
 // Depends only on Reactor, SLF4J API, jspecify, and Lombok
 
+plugins {
+    `java-library`
+    alias(libs.plugins.spring.dependency.management)
+}
+
 dependencies {
     api(libs.reactor.core)
     api("org.slf4j:slf4j-api")
@@ -8,8 +13,6 @@ dependencies {
 
     compileOnly(libs.lombok)
     annotationProcessor(libs.lombok)
-    testCompileOnly(libs.lombok)
-    testAnnotationProcessor(libs.lombok)
 
     testImplementation(libs.reactor.test)
     testImplementation("org.junit.jupiter:junit-jupiter")

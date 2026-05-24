@@ -1,5 +1,10 @@
 // Spring Boot starter — wires the saga core into a Spring application context
 
+plugins {
+    `java-library`
+    alias(libs.plugins.spring.dependency.management)
+}
+
 dependencies {
     api(project(":core"))
     implementation("org.springframework.boot:spring-boot-autoconfigure")
@@ -8,7 +13,6 @@ dependencies {
     compileOnly(libs.lombok)
     annotationProcessor(libs.lombok)
 
-    testImplementation(project(":core"))
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
