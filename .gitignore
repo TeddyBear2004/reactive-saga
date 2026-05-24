@@ -1,0 +1,18 @@
+# Gradle
+.gradle/
+build/
+**/build/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Reference material (original source used for migration)
+source/
+
+# OS
+.DS_Store
+Thumbs.db

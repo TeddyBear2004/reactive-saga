@@ -1,0 +1,41 @@
+package com.saga;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+
+class SagaExecutionContext {
+
+    private final List<Object> executionOutputs = new CopyOnWriteArrayList<>();
+    private final List<RollbackRecord> rollbackStack = new CopyOnWriteArrayList<>();
+
+    SagaExecutionContext(Object initialPayload) {
+        this.executionOutputs.add(initialPayload);
+    }
+
+    List<Object> getExecutionOutputs() { return executionOutputs; }
+
+    void addOutput(Object output) {
+        if (output instanceof ParallelOutputs(List<Object> values)) {
+            executionOutputs.addAll(values);
+        } else {
+            executionOutputs.add(output);
+        }
+    }
+
+    void addNullOutput() { executionOutputs.add(null); }
+
+    void addRollbackRecord(SagaTransition<?, ?, ?> transition, Object localState) {
+        rollbackStack.add(new RollbackRecord(transition, localState));
+    }
+
+    int getRollbackStackSize() { return rollbackStack.size(); }
+
+    List<RollbackRecord> getReversedRollbackStack() {
+        List<RollbackRecord> reversed = new ArrayList<>(rollbackStack);
+        Collections.reverse(reversed);
+        return reversed;
+    }
+
+}
