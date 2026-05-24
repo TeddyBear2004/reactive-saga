@@ -1,5 +1,6 @@
 package com.saga;
 
+import com.saga.internal.DefaultSagaBuilder;
 import com.saga.lifecycle.SagaLifecycleObserver;
 import reactor.core.publisher.Mono;
 
@@ -35,7 +36,7 @@ public interface Saga<I, O> {
     Class<O> getOutputClass();
 
     static <I, O> SagaBuilder<I, O> builder(String name, Class<I> initClass, Class<O> finalClass) {
-        return new SagaBuilder<>(name, List.of(), List.of(initClass), finalClass, null);
+        return new DefaultSagaBuilder<>(name, List.of(), List.of(initClass), finalClass, null);
     }
 
 }

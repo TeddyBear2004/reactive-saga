@@ -1,25 +1,43 @@
 package com.saga.lock;
 
-import lombok.*;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.util.UUID;
 
-@Getter
-@Setter
-@NoArgsConstructor
-@EqualsAndHashCode(of = "id")
-@ToString
-public class SagaLock {
+/**
+ * Represents a distributed lock acquired during saga execution.
+ *
+ * <p>Instances are created by {@link SagaLockService} internally.
+ * Infrastructure implementations of {@link SagaLockRepository} receive and return
+ * this interface; they may use their own persistence entity as long as it implements it.
+ */
+public interface SagaLock {
 
-    private SagaLockId id;
-    private UUID sagaId;
-    private String sagaName;
-    private String resourceType;
-    private String resourceId;
-    private String userId;
-    private Instant startedAt;
-    private Instant releasedAt;
-    private SagaLockStatus status;
+    @Nullable SagaLockId getId();
+
+    UUID getSagaId();
+
+    String getSagaName();
+
+    String getResourceType();
+
+    String getResourceId();
+
+    @Nullable String getUserId();
+
+    Instant getStartedAt();
+
+    @Nullable Instant getReleasedAt();
+
+    SagaLockStatus getStatus();
+
+    /** Creates an immutable {@link SagaLock} value. Used internally by the saga engine. */
+    static SagaLock of(@Nullable SagaLockId id, UUID sagaId, String sagaName,
+                       String resourceType, String resourceId, @Nullable String userId,
+                       Instant startedAt, @Nullable Instant releasedAt, SagaLockStatus status) {
+        return new com.saga.internal.DefaultSagaLock(id, sagaId, sagaName, resourceType,
+                                                     resourceId, userId, startedAt, releasedAt, status);
+    }
 
 }

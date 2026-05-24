@@ -1,5 +1,7 @@
-package com.saga.step;
+package com.saga.internal;
 
+import com.saga.step.SagaStep;
+import com.saga.step.StepResult;
 import reactor.core.publisher.Mono;
 
 /**

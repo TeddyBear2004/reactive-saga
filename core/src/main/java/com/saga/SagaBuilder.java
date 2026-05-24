@@ -1,120 +1,40 @@
 package com.saga;
 
-import com.saga.internal.InputResolver;
-import com.saga.internal.InputResolvers;
-import com.saga.internal.SagaImpl;
-import com.saga.internal.SagaInputMapper;
-import com.saga.internal.SagaProxyFactory;
-import com.saga.internal.SagaTransition;
-import com.saga.internal.ParallelSagaStepGroup;
 import com.saga.lifecycle.SagaLifecycleObserver;
 import com.saga.lock.LockableResourceId;
 import com.saga.lock.SagaLockService;
-import com.saga.step.InjectPropertyStep;
 import com.saga.step.SagaStep;
 import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
 
 /**
- * Immutable, fluent builder for {@link Saga} instances.
+ * Fluent builder for {@link Saga} instances.
+ *
+ * <p>Obtain an instance via {@link Saga#builder(String, Class, Class)}.
  *
  * @param <I> initial payload type
  * @param <O> final output type
  */
-public class SagaBuilder<I, O> {
+public interface SagaBuilder<I, O> {
 
-    private final String name;
-    private final List<SagaTransition<?, ?, ?>> transitions;
-    private final List<Class<?>> outputHistory;
-    private final Class<O> outputClass;
-    private final @Nullable SagaLifecycleObserver observer;
-    private final @Nullable Function<I, List<LockableResourceId>> lockResourcesExtractor;
-    private final @Nullable SagaLockService sagaLockService;
-
-    SagaBuilder(String name, List<SagaTransition<?, ?, ?>> transitions, List<Class<?>> outputHistory,
-                Class<O> outputClass, @Nullable SagaLifecycleObserver observer) {
-        this(name, transitions, outputHistory, outputClass, observer, null, null);
-    }
-
-    SagaBuilder(String name, List<SagaTransition<?, ?, ?>> transitions, List<Class<?>> outputHistory,
-                Class<O> outputClass, @Nullable SagaLifecycleObserver observer,
-                @Nullable Function<I, List<LockableResourceId>> lockResourcesExtractor,
-                @Nullable SagaLockService sagaLockService) {
-        this.name = name;
-        this.transitions = transitions;
-        this.outputHistory = outputHistory;
-        this.outputClass = outputClass;
-        this.observer = observer;
-        this.lockResourcesExtractor = lockResourcesExtractor;
-        this.sagaLockService = sagaLockService;
-    }
-
-    public SagaBuilder<I, O> withObserver(SagaLifecycleObserver observer) {
-        return new SagaBuilder<>(name, transitions, outputHistory, outputClass, observer, lockResourcesExtractor, sagaLockService);
-    }
+    SagaBuilder<I, O> withObserver(SagaLifecycleObserver observer);
 
     /** Configures exclusive resource locking around every {@link Saga#execute} call. */
-    public SagaBuilder<I, O> withLock(Function<I, List<LockableResourceId>> resourcesExtractor) {
-        return new SagaBuilder<>(name, transitions, outputHistory, outputClass, observer, resourcesExtractor, sagaLockService);
-    }
+    SagaBuilder<I, O> withLock(Function<I, List<LockableResourceId>> resourcesExtractor);
 
     /** Sets the {@link SagaLockService}. Normally injected by a factory — not for direct use. */
-    public SagaBuilder<I, O> withSagaLockService(@Nullable SagaLockService sagaLockService) {
-        return new SagaBuilder<>(name, transitions, outputHistory, outputClass, observer, lockResourcesExtractor, sagaLockService);
-    }
+    SagaBuilder<I, O> withSagaLockService(@Nullable SagaLockService sagaLockService);
 
-    public <NI, NO, L> SagaBuilder<I, O> step(SagaStep<NI, NO, L> step) {
-        InputResolver<NI> resolver = createResolver(step.inputType(), outputHistory);
-        List<SagaTransition<?, ?, ?>> nextTransitions = append(transitions, new SagaTransition<>(step, resolver));
-        List<Class<?>> nextHistory = append(outputHistory, step.outputType());
-        return new SagaBuilder<>(name, nextTransitions, nextHistory, outputClass, observer, lockResourcesExtractor, sagaLockService);
-    }
+    <NI, NO, L> SagaBuilder<I, O> step(SagaStep<NI, NO, L> step);
 
-    public SagaBuilder<I, O> parallel(String groupName, SagaStep<?, ?, ?>... subSteps) {
-        return parallel(groupName, List.of(subSteps));
-    }
+    SagaBuilder<I, O> parallel(String groupName, SagaStep<?, ?, ?>... subSteps);
 
-    public SagaBuilder<I, O> parallel(String groupName, List<SagaStep<?, ?, ?>> subSteps) {
-        List<ParallelSagaStepGroup.ParallelMember<?, ?, ?>> members = new ArrayList<>();
-        List<Class<?>> nextHistory = new ArrayList<>(outputHistory);
-        for (SagaStep<?, ?, ?> s : subSteps) {
-            members.add(createParallelMember(s));
-            nextHistory.add(s.outputType());
-        }
-        ParallelSagaStepGroup group = new ParallelSagaStepGroup(groupName, members);
-        List<SagaTransition<?, ?, ?>> nextTransitions = append(transitions,
-                new SagaTransition<>(group, InputResolvers.parallelGroupResolver()));
-        return new SagaBuilder<>(name, nextTransitions, nextHistory, outputClass, observer, lockResourcesExtractor, sagaLockService);
-    }
+    SagaBuilder<I, O> parallel(String groupName, List<SagaStep<?, ?, ?>> subSteps);
 
-    public SagaBuilder<I, O> injectProperties(Object properties) {
-        return step(new InjectPropertyStep<>(properties));
-    }
+    SagaBuilder<I, O> injectProperties(Object properties);
 
-    public Saga<I, O> build() {
-        if (transitions.isEmpty()) throw new IllegalStateException("Saga must have at least one step");
-        return new SagaImpl<>(name, transitions, outputClass, observer,
-                              createResolver(outputClass, outputHistory), lockResourcesExtractor, sagaLockService);
-    }
+    Saga<I, O> build();
 
-    private <T> ParallelSagaStepGroup.ParallelMember<T, ?, ?> createParallelMember(SagaStep<T, ?, ?> step) {
-        return new ParallelSagaStepGroup.ParallelMember<>(step, createResolver(step.inputType(), outputHistory));
-    }
-
-    private <T> InputResolver<T> createResolver(Class<T> type, List<Class<?>> history) {
-        if (type == Void.class) return InputResolvers.voidResolver();
-        if (type.isInterface() || type.isRecord()) {
-            return InputResolvers.proxyResolver(new SagaProxyFactory(type, SagaInputMapper.buildMapping(type, history)));
-        }
-        return InputResolvers.directResolver();
-    }
-
-    private static <T> List<T> append(List<T> list, T element) {
-        List<T> next = new ArrayList<>(list);
-        next.add(element);
-        return next;
-    }
 }

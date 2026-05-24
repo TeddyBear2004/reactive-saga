@@ -60,35 +60,26 @@ public class DefaultSagaLockService implements SagaLockService {
     private Mono<Void> updateLocks(List<SagaLock> locks, SagaLockStatus status) {
         Instant now = Instant.now();
         return Flux.fromIterable(locks)
-                .flatMap(lock -> {
-                    lock.setStatus(status);
-                    lock.setReleasedAt(now);
-                    return repository.save(lock);
-                })
+                .flatMap(lock -> repository.save(
+                        SagaLock.of(lock.getId(), lock.getSagaId(), lock.getSagaName(),
+                                    lock.getResourceType(), lock.getResourceId(), lock.getUserId(),
+                                    lock.getStartedAt(), now, status)))
                 .then();
     }
 
     private Mono<Void> releaseLocksForSaga(UUID sagaId) {
         return repository.findBySagaId(sagaId)
-                .flatMap(lock -> {
-                    lock.setStatus(SagaLockStatus.RELEASED);
-                    lock.setReleasedAt(Instant.now());
-                    return repository.save(lock);
-                })
+                .flatMap(lock -> repository.save(
+                        SagaLock.of(lock.getId(), lock.getSagaId(), lock.getSagaName(),
+                                    lock.getResourceType(), lock.getResourceId(), lock.getUserId(),
+                                    lock.getStartedAt(), Instant.now(), SagaLockStatus.RELEASED)))
                 .then()
                 .onErrorResume(e -> { log.error("Failed to rollback partial locks sagaId={}: {}", sagaId, e.getMessage(), e); return Mono.empty(); });
     }
 
     private static SagaLock buildLock(SagaLockContext ctx, LockableResourceId res, Instant now) {
-        SagaLock lock = new SagaLock();
-        lock.setSagaId(ctx.sagaId());
-        lock.setSagaName(ctx.sagaName());
-        lock.setResourceType(res.resourceType());
-        lock.setResourceId(res.resourceId());
-        lock.setUserId(ctx.userId());
-        lock.setStartedAt(now);
-        lock.setStatus(SagaLockStatus.ACTIVE);
-        return lock;
+        return SagaLock.of(null, ctx.sagaId(), ctx.sagaName(), res.resourceType(), res.resourceId(),
+                           ctx.userId(), now, null, SagaLockStatus.ACTIVE);
     }
 
 }
