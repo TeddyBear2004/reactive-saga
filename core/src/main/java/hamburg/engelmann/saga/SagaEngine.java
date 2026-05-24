@@ -23,8 +23,8 @@ import hamburg.engelmann.saga.lock.SagaLockService;
  * <p>Engine-level configuration (observer, lock service) is applied to every {@link Saga} built from
  * the engine, and overrides any equivalent settings on the builder.
  *
- * @see com.saga.engine.memory.InMemorySagaEngine
- * @see com.saga.engine.persistent.PersistentSagaEngine
+ * @see hamburg.engelmann.engine.memory.InMemorySagaEngine
+ * @see hamburg.engelmann.engine.persistent.PersistentSagaEngine
  */
 public interface SagaEngine {
 

@@ -12,7 +12,7 @@ import org.jspecify.annotations.Nullable;
  * Execution state lives entirely in the reactive chain — no persistence across calls.
  *
  * <p>This is the default engine for most applications. Use
- * {@link com.saga.engine.persistent.PersistentSagaEngine} when crash-recovery or
+ * {@link hamburg.engelmann.engine.persistent.PersistentSagaEngine} when crash-recovery or
  * durable distributed execution is required.
  *
  * <p>Typical usage:

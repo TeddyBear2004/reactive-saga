@@ -1,4 +1,4 @@
-module com.saga.core {
+module hamburg.engelmann.core {
     requires reactor.core;
     requires org.slf4j;
     requires static org.jspecify;

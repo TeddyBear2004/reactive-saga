@@ -6,7 +6,7 @@ plugins {
 }
 
 allprojects {
-    group = "com.saga"
+    group = "hamburg.engelmann"
     version = project.findProperty("projectVersion") as? String ?: "0.0.1-SNAPSHOT"
 
     repositories {

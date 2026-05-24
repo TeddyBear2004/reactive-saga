@@ -11,7 +11,7 @@ import java.util.List;
  * with the same {@code (sagaName, correlationId)}, to restore those outputs so completed
  * steps are skipped and execution resumes from where it left off.
  *
- * <p>Obtain instances from {@link com.saga.engine.persistent.PersistentSagaEngine}.
+ * <p>Obtain instances from {@link hamburg.engelmann.engine.persistent.PersistentSagaEngine}.
  */
 public interface SagaPersistenceHook {
 
