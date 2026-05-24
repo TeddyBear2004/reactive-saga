@@ -1,2 +1,2 @@
-com.saga.spring.PersistentSagaAutoConfiguration
-com.saga.spring.SagaAutoConfiguration
+hamburg.engelmann.saga.spring.PersistentSagaAutoConfiguration
+hamburg.engelmann.saga.spring.SagaAutoConfiguration

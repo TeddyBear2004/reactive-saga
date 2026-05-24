@@ -5,8 +5,8 @@ module com.saga.core {
     requires static lombok;
     requires org.reactivestreams;
 
-    exports com.saga;
-    exports com.saga.step;
-    exports com.saga.lifecycle;
-    exports com.saga.lock;
+    exports hamburg.engelmann.saga;
+    exports hamburg.engelmann.saga.step;
+    exports hamburg.engelmann.saga.lifecycle;
+    exports hamburg.engelmann.saga.lock;
 }
