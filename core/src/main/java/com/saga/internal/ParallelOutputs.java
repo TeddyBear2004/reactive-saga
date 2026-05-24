@@ -1,9 +1,9 @@
-package com.saga.step;
+package com.saga.internal;
 
 import java.util.List;
 
 /**
  * Aggregated output of all sub-steps in a parallel group.
- * The outputs are in the same order as the sub-steps were declared.
+ * This is an internal type — consumers never reference it directly.
  */
 public record ParallelOutputs(List<Object> values) {}

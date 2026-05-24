@@ -27,4 +27,21 @@ public record StepResult<O, L>(O output, L localState) {
     /** Singleton sentinel used when a step produces no meaningful output. */
     public static final EmptyOutput EMPTY_OUTPUT = new EmptyOutput();
 
+    /**
+     * Sentinel type for steps that produce no meaningful output.
+     *
+     * <p>Only {@link StepResult} can instantiate this class. Use the
+     * factory methods {@link #empty()} or {@link #noOutput(Object)} rather than
+     * constructing directly.
+     */
+    public static final class EmptyOutput {
+
+        private EmptyOutput() {}
+
+        @Override
+        public String toString() { return "EmptyOutput"; }
+
+    }
+
 }
+

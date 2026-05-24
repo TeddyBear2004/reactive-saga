@@ -1,6 +1,5 @@
 package com.saga.internal;
 
-import com.saga.step.ParallelOutputs;
 import com.saga.step.SagaStep;
 import com.saga.step.StepResult;
 import org.slf4j.Logger;

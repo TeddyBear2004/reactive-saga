@@ -1,6 +1,6 @@
 package com.saga.internal;
 
-import com.saga.step.EmptyOutput;
+import com.saga.step.StepResult;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.RecordComponent;
@@ -65,7 +65,7 @@ public class SagaInputMapper {
         if (matches.isEmpty()) {
             String available = history.isEmpty() ? "<no previous steps>"
                     : history.stream().map(c -> {
-                        if (c == EmptyOutput.class) return "";
+                        if (c == StepResult.EmptyOutput.class) return "";
                         List<String> props = c.isRecord()
                                 ? Arrays.stream(c.getRecordComponents()).map(rc -> rc.getType().getSimpleName() + " " + rc.getName()).toList()
                                 : Arrays.stream(c.getMethods()).filter(m -> m.getParameterCount() == 0 && !m.getName().equals("getClass") && !m.getReturnType().equals(void.class)).map(m -> m.getName() + ": " + m.getReturnType().getSimpleName()).toList();
