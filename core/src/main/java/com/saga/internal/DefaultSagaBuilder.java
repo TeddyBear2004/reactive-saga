@@ -2,6 +2,7 @@ package com.saga.internal;
 
 import com.saga.Saga;
 import com.saga.SagaBuilder;
+import com.saga.SagaPersistenceHook;
 import com.saga.lifecycle.SagaLifecycleObserver;
 import com.saga.lock.LockableResourceId;
 import com.saga.lock.SagaLockService;
@@ -25,18 +26,22 @@ public class DefaultSagaBuilder<I, O> implements SagaBuilder<I, O> {
     private final @Nullable SagaLifecycleObserver observer;
     private final @Nullable Function<I, List<LockableResourceId>> lockResourcesExtractor;
     private final @Nullable SagaLockService sagaLockService;
+    private final @Nullable Function<I, String> correlationIdExtractor;
+    private final @Nullable SagaPersistenceHook persistenceHook;
 
     public DefaultSagaBuilder(String name, List<SagaTransition<?, ?, ?>> transitions,
                                List<Class<?>> outputHistory, Class<O> outputClass,
                                @Nullable SagaLifecycleObserver observer) {
-        this(name, transitions, outputHistory, outputClass, observer, null, null);
+        this(name, transitions, outputHistory, outputClass, observer, null, null, null, null);
     }
 
     public DefaultSagaBuilder(String name, List<SagaTransition<?, ?, ?>> transitions,
                                List<Class<?>> outputHistory, Class<O> outputClass,
                                @Nullable SagaLifecycleObserver observer,
                                @Nullable Function<I, List<LockableResourceId>> lockResourcesExtractor,
-                               @Nullable SagaLockService sagaLockService) {
+                               @Nullable SagaLockService sagaLockService,
+                               @Nullable Function<I, String> correlationIdExtractor,
+                               @Nullable SagaPersistenceHook persistenceHook) {
         this.name = name;
         this.transitions = transitions;
         this.outputHistory = outputHistory;
@@ -44,24 +49,38 @@ public class DefaultSagaBuilder<I, O> implements SagaBuilder<I, O> {
         this.observer = observer;
         this.lockResourcesExtractor = lockResourcesExtractor;
         this.sagaLockService = sagaLockService;
+        this.correlationIdExtractor = correlationIdExtractor;
+        this.persistenceHook = persistenceHook;
     }
 
     @Override
     public SagaBuilder<I, O> withObserver(SagaLifecycleObserver observer) {
         return new DefaultSagaBuilder<>(name, transitions, outputHistory, outputClass, observer,
-                                        lockResourcesExtractor, sagaLockService);
+                                        lockResourcesExtractor, sagaLockService, correlationIdExtractor, persistenceHook);
     }
 
     @Override
     public SagaBuilder<I, O> withLock(Function<I, List<LockableResourceId>> resourcesExtractor) {
         return new DefaultSagaBuilder<>(name, transitions, outputHistory, outputClass, observer,
-                                        resourcesExtractor, sagaLockService);
+                                        resourcesExtractor, sagaLockService, correlationIdExtractor, persistenceHook);
     }
 
     @Override
     public SagaBuilder<I, O> withSagaLockService(@Nullable SagaLockService sagaLockService) {
         return new DefaultSagaBuilder<>(name, transitions, outputHistory, outputClass, observer,
-                                        lockResourcesExtractor, sagaLockService);
+                                        lockResourcesExtractor, sagaLockService, correlationIdExtractor, persistenceHook);
+    }
+
+    @Override
+    public SagaBuilder<I, O> withCorrelationId(Function<I, String> extractor) {
+        return new DefaultSagaBuilder<>(name, transitions, outputHistory, outputClass, observer,
+                                        lockResourcesExtractor, sagaLockService, extractor, persistenceHook);
+    }
+
+    @Override
+    public SagaBuilder<I, O> withPersistenceHook(SagaPersistenceHook hook) {
+        return new DefaultSagaBuilder<>(name, transitions, outputHistory, outputClass, observer,
+                                        lockResourcesExtractor, sagaLockService, correlationIdExtractor, hook);
     }
 
     @Override
@@ -70,7 +89,7 @@ public class DefaultSagaBuilder<I, O> implements SagaBuilder<I, O> {
         List<SagaTransition<?, ?, ?>> nextTransitions = append(transitions, new SagaTransition<>(step, resolver));
         List<Class<?>> nextHistory = append(outputHistory, step.outputType());
         return new DefaultSagaBuilder<>(name, nextTransitions, nextHistory, outputClass, observer,
-                                        lockResourcesExtractor, sagaLockService);
+                                        lockResourcesExtractor, sagaLockService, correlationIdExtractor, persistenceHook);
     }
 
     @Override
@@ -90,7 +109,7 @@ public class DefaultSagaBuilder<I, O> implements SagaBuilder<I, O> {
         List<SagaTransition<?, ?, ?>> nextTransitions = append(transitions,
                 new SagaTransition<>(group, InputResolvers.parallelGroupResolver()));
         return new DefaultSagaBuilder<>(name, nextTransitions, nextHistory, outputClass, observer,
-                                        lockResourcesExtractor, sagaLockService);
+                                        lockResourcesExtractor, sagaLockService, correlationIdExtractor, persistenceHook);
     }
 
     @Override
@@ -102,7 +121,8 @@ public class DefaultSagaBuilder<I, O> implements SagaBuilder<I, O> {
     public Saga<I, O> build() {
         if (transitions.isEmpty()) throw new IllegalStateException("Saga must have at least one step");
         return new SagaImpl<>(name, transitions, outputClass, observer,
-                              createResolver(outputClass, outputHistory), lockResourcesExtractor, sagaLockService);
+                              createResolver(outputClass, outputHistory), lockResourcesExtractor, sagaLockService,
+                              correlationIdExtractor, persistenceHook);
     }
 
     private <T> ParallelSagaStepGroup.ParallelMember<T, ?, ?> createParallelMember(SagaStep<T, ?, ?> step) {

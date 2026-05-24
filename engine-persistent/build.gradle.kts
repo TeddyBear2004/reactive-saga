@@ -10,6 +10,7 @@ plugins {
 dependencies {
     api(project(":core"))
     implementation(libs.jspecify)
+    implementation("com.fasterxml.jackson.core:jackson-databind")
 
     compileOnly(libs.lombok)
     annotationProcessor(libs.lombok)

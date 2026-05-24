@@ -9,10 +9,27 @@ class SagaExecutionContext {
 
     private final List<Object> executionOutputs = new CopyOnWriteArrayList<>();
     private final List<RollbackRecord> rollbackStack = new CopyOnWriteArrayList<>();
+    private final int completedTransitions;
 
     SagaExecutionContext(Object initialPayload) {
+        this.completedTransitions = 0;
         this.executionOutputs.add(initialPayload);
     }
+
+    /**
+     * Resume constructor: pre-populates outputs from a previous execution.
+     * {@code completedTransitions} tracks how many transitions to skip in the chain.
+     * {@code preloadedOutputs} is the flat output list (excluding the initial payload which
+     * is added separately as the first entry).
+     */
+    SagaExecutionContext(Object initialPayload, List<Object> preloadedOutputs, int completedTransitions) {
+        this.completedTransitions = completedTransitions;
+        this.executionOutputs.add(initialPayload);
+        this.executionOutputs.addAll(preloadedOutputs);
+    }
+
+    /** How many transitions were already completed before this execution began (resume offset). */
+    int getCompletedTransitions() { return completedTransitions; }
 
     List<Object> getExecutionOutputs() { return executionOutputs; }
 

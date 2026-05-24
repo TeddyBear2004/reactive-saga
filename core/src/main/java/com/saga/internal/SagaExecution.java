@@ -1,13 +1,18 @@
 package com.saga.internal;
 
+import com.saga.SagaPersistenceHook;
+import com.saga.SagaResumePoint;
 import com.saga.lifecycle.SagaLifecycleObserver;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Function;
 
 class SagaExecution<I, O> {
 
@@ -18,44 +23,102 @@ class SagaExecution<I, O> {
     private final InputResolver<O> finalOutputResolver;
     private final Class<O> outputClass;
     private final SagaCompensator compensator;
+    private final @Nullable Function<I, String> correlationIdExtractor;
+    private final @Nullable SagaPersistenceHook persistenceHook;
 
     SagaExecution(String name, List<SagaTransition<?, ?, ?>> transitions,
-                  InputResolver<O> finalOutputResolver, Class<O> outputClass) {
+                  InputResolver<O> finalOutputResolver, Class<O> outputClass,
+                  @Nullable Function<I, String> correlationIdExtractor,
+                  @Nullable SagaPersistenceHook persistenceHook) {
         this.name = name;
         this.transitions = transitions;
         this.finalOutputResolver = finalOutputResolver;
         this.outputClass = outputClass;
         this.compensator = new SagaCompensator(name);
+        this.correlationIdExtractor = correlationIdExtractor;
+        this.persistenceHook = persistenceHook;
     }
 
     String getName() { return name; }
     Class<O> getOutputClass() { return outputClass; }
 
-    Mono<O> execute(I initialPayload, SagaLifecycleObserver obs) {
+    Mono<O> execute(I initialPayload, @Nullable SagaLifecycleObserver obs) {
         return Mono.defer(() -> {
             UUID traceId = UUID.randomUUID();
+            String correlationId = (correlationIdExtractor != null)
+                    ? correlationIdExtractor.apply(initialPayload)
+                    : traceId.toString();
             Instant start = Instant.now();
-            log.info("[Saga:{}] Starting execution with trace ID: {}", name, traceId);
+            log.info("[Saga:{}] Starting execution correlationId={} traceId={}", name, correlationId, traceId);
             if (obs != null) obs.onSagaStarted(name);
 
-            SagaExecutionContext context = new SagaExecutionContext(initialPayload);
-            Mono<Object> chain = Mono.just(initialPayload);
+            Mono<SagaExecutionContext> contextMono = buildContext(initialPayload, correlationId);
 
-            for (SagaTransition<?, ?, ?> t : transitions) {
-                chain = chain.flatMap(input ->
-                        new SagaStepProcessor(t, obs, name, traceId).processStep(input, context));
-            }
+            return contextMono.flatMap(context -> {
+                int startIndex = context.getCompletedTransitions();
+                // The chain starts from the last preloaded output (or the initial payload).
+                List<Object> outputs = context.getExecutionOutputs();
+                Object startValue = outputs.get(outputs.size() - 1);
 
-            return chain
-                    .onErrorResume(err -> compensator.compensate(context, err, obs))
-                    .doOnSuccess(_ -> {
-                        log.info("[Saga:{}] Completed successfully in {}ms.", traceId,
-                                 start.until(Instant.now()).toMillis());
-                        if (obs != null) obs.onSagaCompleted(name);
-                    })
-                    .mapNotNull(_ -> finalOutputResolver.resolve(null, context.getExecutionOutputs()))
-                    .cast(outputClass);
+                Mono<Object> chain = Mono.just(startValue);
+
+                for (int i = 0; i < transitions.size(); i++) {
+                    final int transitionIndex = i;
+                    final SagaTransition<?, ?, ?> t = transitions.get(i);
+
+                    if (transitionIndex < startIndex) {
+                        // Transition already completed — skip execution.
+                        // The context is pre-populated; keep chain value as-is for directResolver
+                        // compatibility (proxy/void resolvers use context, not the raw chain value).
+                        chain = chain.map(v -> v);
+                    } else {
+                        chain = chain.flatMap(input -> {
+                            int sizeBefore = context.getExecutionOutputs().size();
+                            Mono<Object> step = new SagaStepProcessor(t, obs, name, traceId)
+                                    .processStep(input, context);
+                            if (persistenceHook == null) return step;
+                            return step.flatMap(result -> {
+                                int sizeAfter = context.getExecutionOutputs().size();
+                                List<Object> diff = context.getExecutionOutputs()
+                                        .subList(sizeBefore, sizeAfter);
+                                return persistenceHook
+                                        .afterStep(name, correlationId, transitionIndex,
+                                                   Collections.unmodifiableList(diff))
+                                        .thenReturn(result);
+                            });
+                        });
+                    }
+                }
+
+                return chain
+                        .onErrorResume(err -> {
+                            Mono<Object> compensated = compensator.compensate(context, err, obs);
+                            if (persistenceHook == null) return compensated;
+                            return compensated.then(persistenceHook.onFailed(name, correlationId))
+                                    .then(Mono.error(err));
+                        })
+                        .doOnSuccess(_ -> log.info("[Saga:{}] Completed successfully in {}ms. correlationId={}",
+                                                   name, start.until(Instant.now()).toMillis(), correlationId))
+                        .mapNotNull(_ -> finalOutputResolver.resolve(null, context.getExecutionOutputs()))
+                        .cast(outputClass)
+                        .flatMap(finalOutput -> {
+                            if (obs != null) obs.onSagaCompleted(name);
+                            if (persistenceHook == null) return Mono.just(finalOutput);
+                            return persistenceHook.onCompleted(name, correlationId).thenReturn(finalOutput);
+                        });
+            });
         });
+    }
+
+    private Mono<SagaExecutionContext> buildContext(I initialPayload, String correlationId) {
+        if (persistenceHook == null) {
+            return Mono.just(new SagaExecutionContext(initialPayload));
+        }
+        return persistenceHook.loadResumePoint(name, correlationId)
+                .map(rp -> new SagaExecutionContext(initialPayload,
+                                                    rp.preloadedOutputs(),
+                                                    rp.completedTransitions()))
+                .defaultIfEmpty(new SagaExecutionContext(initialPayload));
     }
 
 }

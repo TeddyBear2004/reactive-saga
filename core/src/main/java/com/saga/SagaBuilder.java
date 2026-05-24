@@ -27,6 +27,20 @@ public interface SagaBuilder<I, O> {
     /** Sets the {@link SagaLockService}. Normally injected by a factory — not for direct use. */
     SagaBuilder<I, O> withSagaLockService(@Nullable SagaLockService sagaLockService);
 
+    /**
+     * Extracts a stable business identifier from the initial input.
+     * Used by persistence hooks to identify and resume an interrupted execution.
+     * If not set, a random ID is generated per execution (no resume support).
+     */
+    SagaBuilder<I, O> withCorrelationId(Function<I, String> extractor);
+
+    /**
+     * Attaches a persistence hook that checkpoints step outputs and supports crash recovery.
+     *
+     * @see SagaPersistenceHook
+     */
+    SagaBuilder<I, O> withPersistenceHook(SagaPersistenceHook hook);
+
     <NI, NO, L> SagaBuilder<I, O> step(SagaStep<NI, NO, L> step);
 
     SagaBuilder<I, O> parallel(String groupName, SagaStep<?, ?, ?>... subSteps);

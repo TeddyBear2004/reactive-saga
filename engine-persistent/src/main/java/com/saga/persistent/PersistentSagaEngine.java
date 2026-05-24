@@ -3,28 +3,39 @@ package com.saga.persistent;
 import com.saga.Saga;
 import com.saga.SagaBuilder;
 import com.saga.SagaEngine;
+import com.saga.SagaPersistenceHook;
+import com.saga.SagaResumePoint;
 import com.saga.lifecycle.SagaLifecycleObserver;
 import com.saga.lock.SagaLockService;
 import org.jspecify.annotations.Nullable;
+import reactor.core.publisher.Mono;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * {@link SagaEngine} that persists execution state after every completed step,
  * enabling crash recovery and durable distributed saga execution.
  *
+ * <p>On each step completion the serialized output(s) are appended to
+ * {@link SagaExecutionState} and saved via {@link SagaExecutionRepository}.
+ * On the next execution with the same {@code correlationId}, persisted outputs are loaded and
+ * completed steps are skipped — execution resumes from the first incomplete step.
+ *
  * <p>Usage:
  * <pre>{@code
- * SagaEngine engine = new PersistentSagaEngine(repository, serializer);
+ * SagaEngine engine = new PersistentSagaEngine(repository,
+ *         SagaStateSerializer.jacksonWithFqcn(objectMapper));
  *
  * Saga<Order, Receipt> saga = engine.build(
  *         Saga.builder("OrderFlow", Order.class, Receipt.class)
+ *                 .withCorrelationId(Order::orderId)
  *                 .step(new ValidateOrderStep())
  *                 .step(new ReserveInventoryStep())
  * );
  * }</pre>
- *
- * <p><strong>Note:</strong> Step-by-step state persistence and crash-recovery resume logic are
- * not yet implemented. This class is a scaffold defining the public API and SPIs.
- * Use {@link SagaEngine#inMemory()} for current production usage.
  *
  * @see SagaExecutionRepository
  * @see SagaStateSerializer
@@ -60,22 +71,86 @@ public final class PersistentSagaEngine implements SagaEngine {
         return new PersistentSagaEngine(repository, serializer, observer, lockService);
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @throws UnsupportedOperationException always — persistent execution is not yet implemented
-     */
     @Override
     public <I, O> Saga<I, O> build(SagaBuilder<I, O> builder) {
-        // TODO: implement PersistentSagaImpl
-        //   1. Check SagaExecutionRepository for an existing IN_PROGRESS execution (resume path)
-        //   2. After each step, serialize the output and save SagaExecutionState via repository
-        //   3. On error, persist FAILED status and trigger compensation
-        //   4. On success, persist COMPLETED status (or delete if ephemeral cleanup is preferred)
-        //   Serialization design decision needed: step output types must be known at resume time.
-        throw new UnsupportedOperationException(
-                "PersistentSagaEngine is not yet implemented. Use SagaEngine.inMemory() instead."
-        );
+        SagaBuilder<I, O> configured = builder;
+        if (observer != null) configured = configured.withObserver(observer);
+        if (lockService != null) configured = configured.withSagaLockService(lockService);
+        return configured
+                .withPersistenceHook(new PersistenceHook())
+                .build();
+    }
+
+    private final class PersistenceHook implements SagaPersistenceHook {
+
+        @Override
+        public Mono<Void> afterStep(String sagaName, String correlationId,
+                                    int transitionIndex, List<Object> stepOutputs) {
+            SagaExecutionId id = new SagaExecutionId(sagaName, correlationId);
+            return repository.findById(id)
+                    .defaultIfEmpty(newState(id))
+                    .flatMap(state -> {
+                        List<byte[]> updated = new ArrayList<>(state.serializedStepOutputs());
+                        for (Object output : stepOutputs) {
+                            updated.add(serializer.serialize(output));
+                        }
+                        return repository.save(new SagaExecutionState(
+                                state.id(),
+                                SagaExecutionStatus.IN_PROGRESS,
+                                transitionIndex + 1,
+                                Collections.unmodifiableList(updated),
+                                state.createdAt(),
+                                Instant.now()
+                        ));
+                    })
+                    .then();
+        }
+
+        @Override
+        public Mono<SagaResumePoint> loadResumePoint(String sagaName, String correlationId) {
+            return repository.findById(new SagaExecutionId(sagaName, correlationId))
+                    .filter(s -> s.status() == SagaExecutionStatus.IN_PROGRESS)
+                    .map(state -> {
+                        List<Object> outputs = new ArrayList<>();
+                        for (byte[] bytes : state.serializedStepOutputs()) {
+                            outputs.add(serializer.deserialize(bytes, Object.class));
+                        }
+                        return SagaResumePoint.of(state.currentStepIndex(),
+                                                  Collections.unmodifiableList(outputs));
+                    });
+        }
+
+        @Override
+        public Mono<Void> onCompleted(String sagaName, String correlationId) {
+            return updateStatus(sagaName, correlationId, SagaExecutionStatus.COMPLETED);
+        }
+
+        @Override
+        public Mono<Void> onFailed(String sagaName, String correlationId) {
+            return updateStatus(sagaName, correlationId, SagaExecutionStatus.FAILED);
+        }
+
+        private Mono<Void> updateStatus(String sagaName, String correlationId,
+                                        SagaExecutionStatus status) {
+            SagaExecutionId id = new SagaExecutionId(sagaName, correlationId);
+            return repository.findById(id)
+                    .flatMap(state -> repository.save(new SagaExecutionState(
+                            state.id(),
+                            status,
+                            state.currentStepIndex(),
+                            state.serializedStepOutputs(),
+                            state.createdAt(),
+                            Instant.now()
+                    )))
+                    .then();
+        }
+
+        private SagaExecutionState newState(SagaExecutionId id) {
+            Instant now = Instant.now();
+            return new SagaExecutionState(id, SagaExecutionStatus.IN_PROGRESS, 0,
+                                          Collections.emptyList(), now, now);
+        }
+
     }
 
 }

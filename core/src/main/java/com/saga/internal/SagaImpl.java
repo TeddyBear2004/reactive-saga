@@ -1,6 +1,7 @@
 package com.saga.internal;
 
 import com.saga.Saga;
+import com.saga.SagaPersistenceHook;
 import com.saga.lifecycle.SagaLifecycleObserver;
 import com.saga.lock.LockableResourceId;
 import com.saga.lock.SagaLockContext;
@@ -28,9 +29,12 @@ public class SagaImpl<I, O> implements Saga<I, O> {
                     @Nullable SagaLifecycleObserver observer,
                     InputResolver<O> finalOutputResolver,
                     @Nullable Function<I, List<LockableResourceId>> lockResourcesExtractor,
-                    @Nullable SagaLockService sagaLockService) {
+                    @Nullable SagaLockService sagaLockService,
+                    @Nullable Function<I, String> correlationIdExtractor,
+                    @Nullable SagaPersistenceHook persistenceHook) {
         this.observer = observer;
-        this.execution = new SagaExecution<>(name, transitions, finalOutputResolver, outputClass);
+        this.execution = new SagaExecution<>(name, transitions, finalOutputResolver, outputClass,
+                                             correlationIdExtractor, persistenceHook);
         this.lockResourcesExtractor = lockResourcesExtractor;
         this.sagaLockService = sagaLockService;
     }
