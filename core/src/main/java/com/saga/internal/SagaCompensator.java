@@ -1,5 +1,7 @@
-package com.saga;
+package com.saga.internal;
 
+import com.saga.lifecycle.SagaLifecycleObserver;
+import com.saga.step.SagaCompensationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;

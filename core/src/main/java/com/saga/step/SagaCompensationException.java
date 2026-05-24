@@ -1,4 +1,4 @@
-package com.saga;
+package com.saga.step;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -31,6 +31,6 @@ public class SagaCompensationException extends RuntimeException {
                + " compensation step(s) failed — system state may be inconsistent: " + steps;
     }
 
-    public record CompensationStepFailure(String stepName, Throwable cause) { }
+    public record CompensationStepFailure(String stepName, Throwable cause) {}
 
 }

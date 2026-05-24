@@ -1,22 +1,23 @@
-package com.saga;
+package com.saga.internal;
 
+import com.saga.step.SagaStep;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
 
-class SagaTransition<I, O, L> {
+public class SagaTransition<I, O, L> {
 
     private final SagaStep<I, O, L> step;
     private final InputResolver<I> inputResolver;
 
-    SagaTransition(SagaStep<I, O, L> step, InputResolver<I> inputResolver) {
+    public SagaTransition(SagaStep<I, O, L> step, InputResolver<I> inputResolver) {
         this.step = step;
         this.inputResolver = inputResolver;
     }
 
     String stepName() { return step.name(); }
 
-    Mono<StepResult<Object, Object>> executeValidated(Object rawInput, List<Object> executionOutputs) {
+    Mono<com.saga.step.StepResult<Object, Object>> executeValidated(Object rawInput, List<Object> executionOutputs) {
         Object actualInput = inputResolver.resolve(rawInput, executionOutputs);
         Class<I> expectedType = step.inputType();
 
@@ -28,7 +29,7 @@ class SagaTransition<I, O, L> {
         }
 
         return step.execute(expectedType.cast(actualInput))
-                .map(res -> new StepResult<>(res.output(), res.localState()));
+                .map(res -> new com.saga.step.StepResult<>(res.output(), res.localState()));
     }
 
     @SuppressWarnings("unchecked")

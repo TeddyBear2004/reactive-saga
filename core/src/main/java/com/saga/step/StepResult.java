@@ -1,4 +1,4 @@
-package com.saga;
+package com.saga.step;
 
 /**
  * Container for the result produced by one saga step.

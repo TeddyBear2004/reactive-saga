@@ -20,7 +20,7 @@ public class SagaAutoConfiguration {
     @ConditionalOnMissingBean
     @ConditionalOnBean(SagaLockRepository.class)
     public SagaLockService sagaLockService(SagaLockRepository repository) {
-        return new SagaLockService(repository);
+        return SagaLockService.create(repository);
     }
 
 }

@@ -1,7 +1,17 @@
 package com.saga;
 
+import com.saga.internal.InputResolver;
+import com.saga.internal.InputResolvers;
+import com.saga.internal.SagaImpl;
+import com.saga.internal.SagaInputMapper;
+import com.saga.internal.SagaProxyFactory;
+import com.saga.internal.SagaTransition;
+import com.saga.internal.ParallelSagaStepGroup;
+import com.saga.lifecycle.SagaLifecycleObserver;
 import com.saga.lock.LockableResourceId;
 import com.saga.lock.SagaLockService;
+import com.saga.step.InjectPropertyStep;
+import com.saga.step.SagaStep;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -46,9 +56,7 @@ public class SagaBuilder<I, O> {
         return new SagaBuilder<>(name, transitions, outputHistory, outputClass, observer, lockResourcesExtractor, sagaLockService);
     }
 
-    /**
-     * Configures exclusive resource locking around every {@link Saga#execute} call.
-     */
+    /** Configures exclusive resource locking around every {@link Saga#execute} call. */
     public SagaBuilder<I, O> withLock(Function<I, List<LockableResourceId>> resourcesExtractor) {
         return new SagaBuilder<>(name, transitions, outputHistory, outputClass, observer, resourcesExtractor, sagaLockService);
     }
@@ -88,8 +96,8 @@ public class SagaBuilder<I, O> {
 
     public Saga<I, O> build() {
         if (transitions.isEmpty()) throw new IllegalStateException("Saga must have at least one step");
-        return new Saga<>(name, transitions, outputClass, observer,
-                          createResolver(outputClass, outputHistory), lockResourcesExtractor, sagaLockService);
+        return new SagaImpl<>(name, transitions, outputClass, observer,
+                              createResolver(outputClass, outputHistory), lockResourcesExtractor, sagaLockService);
     }
 
     private <T> ParallelSagaStepGroup.ParallelMember<T, ?, ?> createParallelMember(SagaStep<T, ?, ?> step) {

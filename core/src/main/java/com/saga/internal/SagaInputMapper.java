@@ -1,4 +1,6 @@
-package com.saga;
+package com.saga.internal;
+
+import com.saga.step.EmptyOutput;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.RecordComponent;
@@ -8,11 +10,11 @@ import java.util.stream.Collectors;
 /**
  * Analyses a target type and the saga output history to produce a field → step index mapping.
  */
-class SagaInputMapper {
+public class SagaInputMapper {
 
-    record OutputLocator(int stepIndex, Method accessor) { }
+    public record OutputLocator(int stepIndex, Method accessor) { }
 
-    static Map<String, OutputLocator> buildMapping(Class<?> target, List<Class<?>> history) {
+    public static Map<String, OutputLocator> buildMapping(Class<?> target, List<Class<?>> history) {
         Map<String, OutputLocator> map = new HashMap<>();
         if (target.isInterface()) {
             for (Method m : target.getMethods()) {

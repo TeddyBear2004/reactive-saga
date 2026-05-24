@@ -1,5 +1,6 @@
-package com.saga;
+package com.saga.internal;
 
+import com.saga.lifecycle.SagaLifecycleObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
@@ -48,7 +49,8 @@ class SagaExecution<I, O> {
             return chain
                     .onErrorResume(err -> compensator.compensate(context, err, obs))
                     .doOnSuccess(_ -> {
-                        log.info("[Saga:{}] Completed successfully in {}ms.", traceId, start.until(Instant.now()).toMillis());
+                        log.info("[Saga:{}] Completed successfully in {}ms.", traceId,
+                                 start.until(Instant.now()).toMillis());
                         if (obs != null) obs.onSagaCompleted(name);
                     })
                     .mapNotNull(_ -> finalOutputResolver.resolve(null, context.getExecutionOutputs()))

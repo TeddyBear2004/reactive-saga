@@ -1,4 +1,6 @@
-package com.saga;
+package com.saga.internal;
+
+import com.saga.step.ParallelOutputs;
 
 import java.util.ArrayList;
 import java.util.Collections;

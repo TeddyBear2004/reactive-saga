@@ -1,4 +1,6 @@
-package com.saga;
+package com.saga.lifecycle;
+
+import com.saga.step.SagaCompensationException;
 
 import java.util.Collections;
 import java.util.List;

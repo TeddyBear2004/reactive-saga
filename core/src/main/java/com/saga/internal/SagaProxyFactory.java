@@ -1,4 +1,4 @@
-package com.saga;
+package com.saga.internal;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Proxy;
@@ -9,12 +9,12 @@ import java.util.Map;
 /**
  * Creates step input instances from the mapping produced by {@link SagaInputMapper}.
  */
-class SagaProxyFactory {
+public class SagaProxyFactory {
 
     private final Class<?> inputType;
     private final Map<String, SagaInputMapper.OutputLocator> mapping;
 
-    SagaProxyFactory(Class<?> inputType, Map<String, SagaInputMapper.OutputLocator> mapping) {
+    public SagaProxyFactory(Class<?> inputType, Map<String, SagaInputMapper.OutputLocator> mapping) {
         this.inputType = inputType;
         this.mapping = mapping;
     }

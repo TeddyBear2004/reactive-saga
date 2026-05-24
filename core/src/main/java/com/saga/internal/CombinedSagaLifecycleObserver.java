@@ -1,17 +1,19 @@
-package com.saga;
+package com.saga.internal;
 
+import com.saga.lifecycle.SagaLifecycleObserver;
+import com.saga.step.SagaCompensationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
-class CombinedSagaLifecycleObserver implements SagaLifecycleObserver {
+public class CombinedSagaLifecycleObserver implements SagaLifecycleObserver {
 
     private static final Logger log = LoggerFactory.getLogger(CombinedSagaLifecycleObserver.class);
 
     private final List<SagaLifecycleObserver> observers;
 
-    CombinedSagaLifecycleObserver(List<SagaLifecycleObserver> observers) {
+    public CombinedSagaLifecycleObserver(List<SagaLifecycleObserver> observers) {
         this.observers = observers;
     }
 

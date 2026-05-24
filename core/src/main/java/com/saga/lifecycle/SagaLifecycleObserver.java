@@ -1,4 +1,9 @@
-package com.saga;
+package com.saga.lifecycle;
+
+import com.saga.internal.CombinedSagaLifecycleObserver;
+import com.saga.step.SagaCompensationException;
+
+import java.util.List;
 
 /**
  * Observer notified about key saga lifecycle events.
@@ -22,11 +27,9 @@ public interface SagaLifecycleObserver {
 
     default void onCompensationFailed(String sagaName, SagaCompensationException error) {}
 
-    /**
-     * Combines multiple observers into one that delegates each event to all of them.
-     */
+    /** Combines multiple observers into one that delegates each event to all of them. */
     static SagaLifecycleObserver combine(SagaLifecycleObserver... observers) {
-        return new CombinedSagaLifecycleObserver(java.util.List.of(observers));
+        return new CombinedSagaLifecycleObserver(List.of(observers));
     }
 
 }
