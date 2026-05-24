@@ -37,4 +37,12 @@ public interface SagaBuilder<I, O> {
 
     Saga<I, O> build();
 
+    /**
+     * Builds the saga using the given engine's execution strategy and shared configuration.
+     * Equivalent to {@code engine.build(this)}.
+     */
+    default Saga<I, O> build(SagaEngine engine) {
+        return engine.build(this);
+    }
+
 }
