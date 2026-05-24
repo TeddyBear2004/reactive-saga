@@ -3,12 +3,11 @@ package com.saga.internal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 class SagaExecutionContext {
 
-    private final List<Object> executionOutputs = new CopyOnWriteArrayList<>();
-    private final List<RollbackRecord> rollbackStack = new CopyOnWriteArrayList<>();
+    private final List<Object> executionOutputs = new ArrayList<>();
+    private final List<RollbackRecord> rollbackStack = new ArrayList<>();
     private final int completedTransitions;
 
     SagaExecutionContext(Object initialPayload) {

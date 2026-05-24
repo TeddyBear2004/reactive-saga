@@ -45,7 +45,7 @@ public class ParallelSagaStepGroup implements SagaStep<Object, ParallelOutputs, 
         List<ParallelMember<?, ?, ?>> completedMembers = new CopyOnWriteArrayList<>();
 
         return Flux.fromIterable(members)
-                .concatMap(member -> {
+                .flatMapSequential(member -> {
                     log.debug("[ParallelSagaStepGroup:{}] Starting sub-step: {}", name, member.step().name());
                     return member.executeWithInjection(history)
                             .doOnSuccess(result -> {

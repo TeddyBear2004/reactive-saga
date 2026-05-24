@@ -2,6 +2,7 @@ package com.saga.internal;
 
 import com.saga.lifecycle.SagaLifecycleObserver;
 import com.saga.step.StepResult;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
@@ -15,11 +16,11 @@ class SagaStepProcessor {
     private static final Logger log = LoggerFactory.getLogger(SagaStepProcessor.class);
 
     private final SagaTransition<?, ?, ?> transition;
-    private final SagaLifecycleObserver obs;
+    private final @Nullable SagaLifecycleObserver obs;
     private final String sagaName;
     private final UUID sagaTraceId;
 
-    SagaStepProcessor(SagaTransition<?, ?, ?> transition, SagaLifecycleObserver obs,
+    SagaStepProcessor(SagaTransition<?, ?, ?> transition, @Nullable SagaLifecycleObserver obs,
                       String sagaName, UUID sagaTraceId) {
         this.transition = transition;
         this.obs = obs;

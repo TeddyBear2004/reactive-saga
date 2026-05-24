@@ -69,9 +69,7 @@ class SagaExecution<I, O> {
 
                     if (transitionIndex < startIndex) {
                         // Transition already completed — skip execution.
-                        // The context is pre-populated; keep chain value as-is for directResolver
-                        // compatibility (proxy/void resolvers use context, not the raw chain value).
-                        chain = chain.map(v -> v);
+                        // The context is pre-populated; the chain value passes through unchanged.
                     } else {
                         chain = chain.flatMap(input -> {
                             int sizeBefore = context.getExecutionOutputs().size();
