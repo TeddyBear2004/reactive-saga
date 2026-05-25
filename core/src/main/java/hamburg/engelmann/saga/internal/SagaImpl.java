@@ -35,10 +35,12 @@ public class SagaImpl<I, O> implements Saga<I, O> {
                     @Nullable SagaLockService sagaLockService,
                     @Nullable Function<I, String> correlationIdExtractor,
                     @Nullable SagaPersistenceHook persistenceHook,
-                    @Nullable Duration sagaTimeout) {
+                    @Nullable Duration sagaTimeout,
+                    List<DeferredLockEntry> deferredLockEntries) {
         this.observer = observer;
         this.execution = new SagaExecution<>(name, transitions, finalOutputResolver, outputClass,
-                                             correlationIdExtractor, persistenceHook);
+                                             correlationIdExtractor, persistenceHook,
+                                             deferredLockEntries, sagaLockService);
         this.lockResourcesExtractor = lockResourcesExtractor;
         this.sagaLockService = sagaLockService;
         this.sagaTimeout = sagaTimeout;

@@ -20,6 +20,25 @@ public interface SagaLockService {
 
     <T> Mono<T> withLock(SagaLockContext context, List<LockableResourceId> resources, Mono<T> execution);
 
+    /**
+     * Acquires locks for the given resources and returns the acquired {@link SagaLock} records.
+     * The caller is responsible for releasing or failing the locks via
+     * {@link #releaseAcquiredLocks} / {@link #failAcquiredLocks}.
+     */
+    Mono<List<SagaLock>> acquireLocks(SagaLockContext context, List<LockableResourceId> resources);
+
+    /**
+     * Marks the given locks as {@link SagaLockStatus#RELEASED}.
+     * Errors during release are logged but do not propagate.
+     */
+    Mono<Void> releaseAcquiredLocks(List<SagaLock> locks);
+
+    /**
+     * Marks the given locks as {@link SagaLockStatus#FAILED}.
+     * Errors during update are logged but do not propagate.
+     */
+    Mono<Void> failAcquiredLocks(List<SagaLock> locks);
+
     static SagaLockService create(SagaLockRepository repository) {
         return new DefaultSagaLockService(repository);
     }

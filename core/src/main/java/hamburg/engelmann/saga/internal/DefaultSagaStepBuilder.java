@@ -49,6 +49,11 @@ class DefaultSagaStepBuilder<I, O> implements SagaStepBuilder<I, O> {
         return new DefaultSagaStepBuilder<>(inner.withLastTransitionRetry(Retry.fixedDelay(maxAttempts, fixedDelay)));
     }
 
+    @Override
+    public SagaBuilder<I, O> withDeferredLock(Class<? extends LockSpec> lockSpecClass) {
+        return inner.withDeferredLockAfterLast(lockSpecClass);
+    }
+
     // All SagaBuilder methods delegate to inner:
 
     @Override

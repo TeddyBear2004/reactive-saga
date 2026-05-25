@@ -33,13 +33,14 @@ public class DefaultSagaLockService implements SagaLockService {
         return Mono.usingWhen(
                 acquireLocks(context, resources),
                 _locks -> execution,
-                this::releaseLocks,
-                (locks, _err) -> failLocks(locks),
-                this::releaseLocks
+                this::releaseAcquiredLocks,
+                (locks, _err) -> failAcquiredLocks(locks),
+                this::releaseAcquiredLocks
         );
     }
 
-    private Mono<List<SagaLock>> acquireLocks(SagaLockContext context, List<LockableResourceId> resources) {
+    @Override
+    public Mono<List<SagaLock>> acquireLocks(SagaLockContext context, List<LockableResourceId> resources) {
         Instant now = Instant.now();
         return Flux.fromIterable(resources)
                 .concatMap(res -> repository.save(buildLock(context, res, now)))
@@ -47,12 +48,14 @@ public class DefaultSagaLockService implements SagaLockService {
                 .onErrorResume(err -> releaseLocksForSaga(context.sagaId()).then(Mono.error(err)));
     }
 
-    private Mono<Void> releaseLocks(List<SagaLock> locks) {
+    @Override
+    public Mono<Void> releaseAcquiredLocks(List<SagaLock> locks) {
         return updateLocks(locks, SagaLockStatus.RELEASED)
                 .onErrorResume(e -> { log.error("Failed to release locks: {}", e.getMessage(), e); return Mono.empty(); });
     }
 
-    private Mono<Void> failLocks(List<SagaLock> locks) {
+    @Override
+    public Mono<Void> failAcquiredLocks(List<SagaLock> locks) {
         return updateLocks(locks, SagaLockStatus.FAILED)
                 .onErrorResume(e -> { log.error("Failed to mark locks FAILED: {}", e.getMessage(), e); return Mono.empty(); });
     }

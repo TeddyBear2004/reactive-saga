@@ -1,6 +1,7 @@
 package hamburg.engelmann.saga.internal;
 
 import hamburg.engelmann.saga.lifecycle.SagaLifecycleObserver;
+import hamburg.engelmann.saga.lock.SagaStepContext;
 import hamburg.engelmann.saga.step.StepResult;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -27,12 +28,13 @@ class SagaStepProcessor {
         this.sagaTraceId = sagaTraceId;
     }
 
-    Mono<Object> processStep(Object currentInput, SagaExecutionContext context) {
+    Mono<Object> processStep(Object currentInput, SagaExecutionContext context,
+                               @Nullable SagaStepContext stepContext) {
         log.debug("[Saga:{}] Executing step: {}", sagaTraceId, transition.stepName());
         if (obs != null) obs.onStepStarted(sagaName, transition.stepName());
 
         Mono<StepResult<Object, Object>> stepMono =
-                transition.executeValidated(currentInput, context.getExecutionOutputs());
+                transition.executeValidated(currentInput, context.getExecutionOutputs(), stepContext);
 
         return stepMono
                 .doOnNext(result -> handleSuccess(result, context))

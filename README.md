@@ -4,8 +4,8 @@ A reactive, type-safe Saga orchestration library for Java built on [Project Reac
 
 ## Overview
 
-The saga pattern coordinates multi-step distributed transactions with automatic compensation (rollback) when any step fails.
-This library provides a fluent, compile-time-safe builder API, a lifecycle observer system, optional resource locking, and pluggable persistence for crash recovery.
+Use this library to coordinate multi-step distributed transactions with automatic compensation (rollback) when any step fails.
+You get a fluent, compile-time-safe builder API and a lifecycle observer system. You can also add optional resource locking and pluggable persistence for crash recovery.
 
 ## Modules
 
@@ -18,14 +18,34 @@ This library provides a fluent, compile-time-safe builder API, a lifecycle obser
 
 ## Quick Start
 
+### 1. Add the dependency
+
+```xml
+<!-- Maven -->
+<dependency>
+  <groupId>hamburg.engelmann</groupId>
+  <artifactId>saga-core</artifactId>
+  <version>1.3.0</version>
+</dependency>
+```
+
+```kotlin
+// Gradle (Kotlin DSL)
+implementation("hamburg.engelmann:saga-core:1.3.0")
+```
+
+### 2. Build and execute a saga
+
 ```java
+import hamburg.engelmann.saga.Saga;
+import reactor.core.publisher.Mono;
+
 Saga<Order, Receipt> saga = Saga.builder("OrderFlow", Order.class, Receipt.class)
         .step(new ValidateOrderStep())
         .step(new ReserveInventoryStep())
         .step(new ChargePaymentStep())
         .build();
 
-// Execute
 Mono<Receipt> result = saga.execute(order);
 ```
 
@@ -34,6 +54,10 @@ Mono<Receipt> result = saga.execute(order);
 Implement `SagaStep<Input, Output, LocalState>`:
 
 ```java
+import hamburg.engelmann.saga.step.SagaStep;
+import hamburg.engelmann.saga.step.StepResult;
+import reactor.core.publisher.Mono;
+
 public class ReserveInventoryStep implements SagaStep<Order, Reservation, String> {
 
     @Override public String name() { return "ReserveInventory"; }
@@ -60,6 +84,8 @@ When a step requires fields from **multiple previous steps**, declare its input 
 and the engine resolves the fields automatically by name and type from the execution history:
 
 ```java
+import hamburg.engelmann.saga.step.SagaStep;
+
 // Downstream step receives both fields resolved from history
 record PaymentInput(String reservationId, long totalCents) {}
 
@@ -95,6 +121,8 @@ Saga.builder("ParallelFlow", Input.class, Output.class)
 ## Lifecycle Observer
 
 ```java
+import hamburg.engelmann.saga.lifecycle.CapturingSagaLifecycleObserver;
+
 CapturingSagaLifecycleObserver observer = CapturingSagaLifecycleObserver.create();
 
 saga.execute(input, observer).block();
@@ -125,7 +153,13 @@ Combine multiple observers with `SagaLifecycleObserver.combine(o1, o2)`.
 
 ### In-Memory (default)
 
+Add `engines:in-memory` to your dependencies (`hamburg.engelmann:saga-engine-in-memory`):
+
 ```java
+import hamburg.engelmann.saga.Saga;
+import hamburg.engelmann.saga.SagaEngine;
+import hamburg.engelmann.saga.engine.memory.InMemorySagaEngine;
+
 SagaEngine engine = InMemorySagaEngine.create();
 Saga<Order, Receipt> saga = engine.build(
         Saga.builder("OrderFlow", Order.class, Receipt.class)
@@ -134,9 +168,16 @@ Saga<Order, Receipt> saga = engine.build(
 
 ### Persistent (crash-recovery)
 
+Add `engines:persistent` to your dependencies (`hamburg.engelmann:saga-engine-persistent`).
+
 Requires a `SagaExecutionRepository` implementation for your datastore and a `SagaStateSerializer`:
 
 ```java
+import hamburg.engelmann.saga.Saga;
+import hamburg.engelmann.saga.SagaEngine;
+import hamburg.engelmann.saga.engine.persistent.PersistentSagaEngine;
+import hamburg.engelmann.saga.engine.persistent.SagaStateSerializer;
+
 SagaEngine engine = new PersistentSagaEngine(repository,
         SagaStateSerializer.jacksonWithFqcn(objectMapper));
 
@@ -147,9 +188,9 @@ Saga<Order, Receipt> saga = engine.build(
                 .step(new ReserveInventoryStep()));
 ```
 
-On restart, if a saga with the same `correlationId` is found `IN_PROGRESS`, completed steps are skipped and execution resumes from the first incomplete step.
+On restart, if a saga with the same `correlationId` is found `IN_PROGRESS`, the engine skips completed steps and resumes execution from the first incomplete step.
 
-Implement `SagaExecutionRepository` for your datastore (R2DBC, MongoDB, Redis, etc.):
+Implement `SagaExecutionRepository` for your datastore (R2DBC (Reactive Relational Database Connectivity), MongoDB, Redis, etc.):
 
 ```java
 @Bean
@@ -165,15 +206,54 @@ Prevent concurrent executions for the same resource:
 ```java
 Saga<Order, Receipt> saga = Saga.builder("OrderFlow", Order.class, Receipt.class)
         .withLock(order -> List.of(order.customerId()))
+        .withSagaLockService(lockService)
         .step(…)
-        .build(engine);
+        .build();
 ```
 
-Provide a `SagaLockRepository` implementation for your datastore; `SagaLockService` is created automatically.
+Provide a `SagaLockRepository` implementation for your datastore:
+
+```java
+SagaLockService lockService = SagaLockService.create(myLockRepository);
+```
+
+### Deferred locks (post-step)
+
+When the resource ID is produced as a step's *output*, declare the lock after that step:
+
+```java
+Saga.builder("OrderFlow", Input.class, Output.class)
+        .step(new SaveOrderStep())         // output contains OrderId
+        .withDeferredLock(OrderLock.class) // acquired after SaveOrderStep using OrderId
+        .step(new ProcessOrderStep())
+        .withSagaLockService(lockService)
+        .build();
+```
+
+### Mid-step locks (`SagaStepContext`)
+
+When the resource ID is only known *inside* the step (e.g. discovered via an async call),
+override the two-argument `execute` overload and call `ctx.acquireLock()`:
+
+```java
+public class CreateOrderStep implements SagaStep<Input, Order, Void> {
+
+    @Override
+    public Mono<StepResult<Order, Void>> execute(Input input, SagaStepContext ctx) {
+        return repository.create(input)
+                .flatMap(order -> ctx.acquireLock(new OrderLock(order.getId()))
+                        .thenReturn(order))
+                .map(StepResult::stateless);
+    }
+}
+```
+
+Locks acquired via `SagaStepContext` are held until the saga ends — released on success,
+marked failed on error. Steps that do not override this method continue to work unchanged.
 
 ## Spring Boot Auto-Configuration
 
-Add `spring-starter` to your dependencies. The following beans are registered automatically:
+Add `spring-starter` to your dependencies. Spring Boot registers the following beans automatically:
 
 | Bean | Condition |
 |---|---|
@@ -194,6 +274,13 @@ saga:
 
 When a step fails, all previously completed steps are compensated in **reverse order**. Each step's `compensate(localState)` method is called with the local state it produced during `execute`.
 
-If any compensation steps themselves fail, a `SagaCompensationException` is thrown. It contains:
+If any compensation steps themselves fail, the engine throws a `SagaCompensationException`. It contains:
 - `getOriginalError()` — the error that triggered compensation
 - `getCompensationFailures()` — per-step compensation failures
+
+## Next Steps
+
+- Implement `SagaExecutionRepository` to add crash-recovery support for your datastore (R2DBC, MongoDB, Redis).
+- Implement `SagaLockRepository` to prevent concurrent executions for the same resource.
+- Use `SagaLifecycleObserver.combine(o1, o2)` to stack logging, metrics, and tracing observers.
+- Add `spring-starter` to integrate with Spring Boot auto-configuration.

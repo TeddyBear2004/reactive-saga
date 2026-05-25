@@ -1,5 +1,6 @@
 package hamburg.engelmann.saga.step;
 
+import hamburg.engelmann.saga.lock.SagaStepContext;
 import reactor.core.publisher.Mono;
 
 /**
@@ -27,6 +28,22 @@ public interface SagaStep<I, O, L> {
      * @return Mono emitting the step result
      */
     Mono<StepResult<O, L>> execute(I input);
+
+    /**
+     * Execute the forward action with access to the saga's lock context.
+     *
+     * <p>Override this method when the resource ID to lock is only known at runtime
+     * (e.g. after an async repository call). Call {@link SagaStepContext#acquireLock}
+     * to acquire a lock and hand it over to the saga — it will be held until saga end.
+     *
+     * <p>By default delegates to {@link #execute(Object)}.
+     *
+     * @param input   output of the previous step (or the initial payload)
+     * @param context provides {@link SagaStepContext#acquireLock} for runtime locking
+     */
+    default Mono<StepResult<O, L>> execute(I input, SagaStepContext context) {
+        return execute(input);
+    }
 
     /**
      * Compensate (roll back) this step. Default: no-op.

@@ -1,10 +1,9 @@
 package hamburg.engelmann.saga.internal;
 
 import hamburg.engelmann.saga.di.internal.InputResolver;
-import hamburg.engelmann.saga.step.RetryableSagaStep;
+import hamburg.engelmann.saga.lock.SagaStepContext;
 import hamburg.engelmann.saga.step.SagaStep;
 import hamburg.engelmann.saga.step.StepResult;
-import hamburg.engelmann.saga.step.TimeoutSagaStep;
 import org.jspecify.annotations.Nullable;
 import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
@@ -41,7 +40,9 @@ public class SagaTransition<I, O, L> {
 
     String stepName() { return step.name(); }
 
-    Mono<StepResult<Object, Object>> executeValidated(Object rawInput, List<Object> executionOutputs) {
+    @SuppressWarnings("unchecked")
+    Mono<StepResult<Object, Object>> executeValidated(Object rawInput, List<Object> executionOutputs,
+                                                       @Nullable SagaStepContext stepContext) {
         Object actualInput = inputResolver.resolve(rawInput, executionOutputs);
         Class<I> expectedType = step.inputType();
 
@@ -52,13 +53,17 @@ public class SagaTransition<I, O, L> {
             ));
         }
 
-        // Build decorator chain in canonical order: Retry( Timeout( base ) )
-        // so the timeout applies per-attempt, not over the whole retry sequence.
-        SagaStep<I, O, L> execStep = step;
-        if (timeout != null)    execStep = new TimeoutSagaStep<>(execStep, timeout);
-        if (retrySpec != null)  execStep = new RetryableSagaStep<>(execStep, retrySpec);
+        I castedInput = expectedType.cast(actualInput);
 
-        return execStep.execute(expectedType.cast(actualInput))
+        // Wrap in Mono.defer so that retries re-invoke step.execute() (not just re-subscribe
+        // to the same Mono instance). This matches the behavior of the old RetryableSagaStep.
+        Mono<StepResult<O, L>> stepMono = Mono.defer(() -> (stepContext != null)
+                ? step.execute(castedInput, stepContext)
+                : step.execute(castedInput));
+        if (timeout != null)    stepMono = stepMono.timeout(timeout);
+        if (retrySpec != null)  stepMono = stepMono.retryWhen(retrySpec);
+
+        return ((Mono<StepResult<Object, Object>>) (Mono<?>) stepMono)
                 .map(res -> new StepResult<>(res.output(), res.localState()));
     }
 

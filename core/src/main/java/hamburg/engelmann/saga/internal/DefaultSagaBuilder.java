@@ -38,7 +38,7 @@ public class DefaultSagaBuilder<I, O> implements SagaBuilder<I, O> {
     public DefaultSagaBuilder(String name, List<SagaTransition<?, ?, ?>> transitions,
                                List<Class<?>> outputHistory, Class<O> outputClass,
                                @Nullable SagaLifecycleObserver observer) {
-        this(name, transitions, outputHistory, outputClass, new SagaConfig<>(observer, Collections.emptyList(), null, null, null, null));
+        this(name, transitions, outputHistory, outputClass, new SagaConfig<>(observer, Collections.emptyList(), Collections.emptyList(), null, null, null, null));
     }
 
     private DefaultSagaBuilder(String name, List<SagaTransition<?, ?, ?>> transitions,
@@ -55,35 +55,42 @@ public class DefaultSagaBuilder<I, O> implements SagaBuilder<I, O> {
     private record SagaConfig<I, O>(
             @Nullable SagaLifecycleObserver observer,
             List<Function<I, ? extends LockSpec>> lockSpecExtractors,
+            List<DeferredLockEntry> deferredLockEntries,
             @Nullable SagaLockService sagaLockService,
             @Nullable Function<I, String> correlationIdExtractor,
             @Nullable SagaPersistenceHook persistenceHook,
             @Nullable Duration sagaTimeout) {
 
         SagaConfig<I, O> withObserver(@Nullable SagaLifecycleObserver obs) {
-            return new SagaConfig<>(obs, lockSpecExtractors, sagaLockService, correlationIdExtractor, persistenceHook, sagaTimeout);
+            return new SagaConfig<>(obs, lockSpecExtractors, deferredLockEntries, sagaLockService, correlationIdExtractor, persistenceHook, sagaTimeout);
         }
 
         SagaConfig<I, O> addLockSpec(Function<I, ? extends LockSpec> extractor) {
             List<Function<I, ? extends LockSpec>> updated = new ArrayList<>(lockSpecExtractors);
             updated.add(extractor);
-            return new SagaConfig<>(observer, Collections.unmodifiableList(updated), sagaLockService, correlationIdExtractor, persistenceHook, sagaTimeout);
+            return new SagaConfig<>(observer, Collections.unmodifiableList(updated), deferredLockEntries, sagaLockService, correlationIdExtractor, persistenceHook, sagaTimeout);
+        }
+
+        SagaConfig<I, O> addDeferredLock(DeferredLockEntry entry) {
+            List<DeferredLockEntry> updated = new ArrayList<>(deferredLockEntries);
+            updated.add(entry);
+            return new SagaConfig<>(observer, lockSpecExtractors, Collections.unmodifiableList(updated), sagaLockService, correlationIdExtractor, persistenceHook, sagaTimeout);
         }
 
         SagaConfig<I, O> withSagaLockService(@Nullable SagaLockService svc) {
-            return new SagaConfig<>(observer, lockSpecExtractors, svc, correlationIdExtractor, persistenceHook, sagaTimeout);
+            return new SagaConfig<>(observer, lockSpecExtractors, deferredLockEntries, svc, correlationIdExtractor, persistenceHook, sagaTimeout);
         }
 
         SagaConfig<I, O> withCorrelationId(Function<I, String> extractor) {
-            return new SagaConfig<>(observer, lockSpecExtractors, sagaLockService, extractor, persistenceHook, sagaTimeout);
+            return new SagaConfig<>(observer, lockSpecExtractors, deferredLockEntries, sagaLockService, extractor, persistenceHook, sagaTimeout);
         }
 
         SagaConfig<I, O> withPersistenceHook(SagaPersistenceHook hook) {
-            return new SagaConfig<>(observer, lockSpecExtractors, sagaLockService, correlationIdExtractor, hook, sagaTimeout);
+            return new SagaConfig<>(observer, lockSpecExtractors, deferredLockEntries, sagaLockService, correlationIdExtractor, hook, sagaTimeout);
         }
 
         SagaConfig<I, O> withTimeout(Duration duration) {
-            return new SagaConfig<>(observer, lockSpecExtractors, sagaLockService, correlationIdExtractor, persistenceHook, duration);
+            return new SagaConfig<>(observer, lockSpecExtractors, deferredLockEntries, sagaLockService, correlationIdExtractor, persistenceHook, duration);
         }
 
         /** Merges all lock spec extractors into a single function, or {@code null} if none. */
@@ -110,6 +117,17 @@ public class DefaultSagaBuilder<I, O> implements SagaBuilder<I, O> {
         InputResolver<S> resolver = createResolver(lockSpecClass, outputHistory);
         Function<I, LockSpec> fn = input -> resolver.resolve(input, List.of(input));
         return new DefaultSagaBuilder<>(name, transitions, outputHistory, outputClass, config.addLockSpec(fn));
+    }
+
+    /**
+     * Records a deferred lock to be acquired after the most recently added step completes.
+     * The resolver is built from the current {@code outputHistory}, which includes the last
+     * step's output type, so it can resolve IDs that are only known after that step runs.
+     */
+    <S extends LockSpec> DefaultSagaBuilder<I, O> withDeferredLockAfterLast(Class<S> lockSpecClass) {
+        InputResolver<S> resolver = createResolver(lockSpecClass, outputHistory);
+        DeferredLockEntry entry = new DeferredLockEntry(transitions.size() - 1, resolver);
+        return new DefaultSagaBuilder<>(name, transitions, outputHistory, outputClass, config.addDeferredLock(entry));
     }
 
     @Override
@@ -191,7 +209,8 @@ public class DefaultSagaBuilder<I, O> implements SagaBuilder<I, O> {
         return new SagaImpl<>(name, transitions, outputClass, config.observer(),
                               createResolver(outputClass, outputHistory), config.mergedLockExtractor(),
                               config.sagaLockService(), config.correlationIdExtractor(),
-                              config.persistenceHook(), config.sagaTimeout());
+                              config.persistenceHook(), config.sagaTimeout(),
+                              config.deferredLockEntries());
     }
 
     private <T> ParallelSagaStepGroup.ParallelMember<T, ?, ?> createParallelMember(SagaStep<T, ?, ?> step) {
