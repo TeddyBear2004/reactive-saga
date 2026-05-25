@@ -1,7 +1,9 @@
 package hamburg.engelmann.saga.internal;
 
+import hamburg.engelmann.saga.step.RetryableSagaStep;
 import hamburg.engelmann.saga.step.SagaStep;
 import hamburg.engelmann.saga.step.StepResult;
+import hamburg.engelmann.saga.step.TimeoutSagaStep;
 import org.jspecify.annotations.Nullable;
 import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
@@ -41,10 +43,6 @@ public class SagaTransition<I, O, L> {
         return new SagaTransition<>(step, inputResolver, timeout, spec);
     }
 
-    @Nullable Duration timeout() { return timeout; }
-
-    @Nullable Retry retrySpec() { return retrySpec; }
-
     String stepName() { return step.name(); }
 
     Mono<StepResult<Object, Object>> executeValidated(Object rawInput, List<Object> executionOutputs) {
@@ -58,7 +56,13 @@ public class SagaTransition<I, O, L> {
             ));
         }
 
-        return step.execute(expectedType.cast(actualInput))
+        // Build decorator chain in canonical order: Retry( Timeout( base ) )
+        // so the timeout applies per-attempt, not over the whole retry sequence.
+        SagaStep<I, O, L> execStep = step;
+        if (timeout != null)    execStep = new TimeoutSagaStep<>(execStep, timeout);
+        if (retrySpec != null)  execStep = new RetryableSagaStep<>(execStep, retrySpec);
+
+        return execStep.execute(expectedType.cast(actualInput))
                 .map(res -> new StepResult<>(res.output(), res.localState()));
     }
 

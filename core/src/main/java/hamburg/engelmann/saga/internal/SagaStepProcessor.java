@@ -7,7 +7,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 
-import java.time.Duration;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -32,13 +31,8 @@ class SagaStepProcessor {
         log.debug("[Saga:{}] Executing step: {}", sagaTraceId, transition.stepName());
         if (obs != null) obs.onStepStarted(sagaName, transition.stepName());
 
-        Mono<StepResult<Object, Object>> stepMono = Mono.defer(
-                () -> transition.executeValidated(currentInput, context.getExecutionOutputs()));
-
-        Duration stepTimeout = transition.timeout();
-        if (stepTimeout != null) stepMono = stepMono.timeout(stepTimeout);
-
-        if (transition.retrySpec() != null) stepMono = stepMono.retryWhen(transition.retrySpec());
+        Mono<StepResult<Object, Object>> stepMono =
+                transition.executeValidated(currentInput, context.getExecutionOutputs());
 
         return stepMono
                 .doOnNext(result -> handleSuccess(result, context))
