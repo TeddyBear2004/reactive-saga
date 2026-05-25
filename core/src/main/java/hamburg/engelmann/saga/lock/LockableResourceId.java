@@ -8,8 +8,11 @@ import java.util.UUID;
  * <p>Default implementations derive {@link #resourceType()} by stripping the {@code "Id"} suffix
  * from the simple class name (e.g. {@code CloudServerId} → {@code "CloudServer"}),
  * and {@link #resourceId()} delegates to {@code value().toString()}.
+ *
+ * <p>Extends {@link Lockable}: every {@code LockableResourceId} can be used directly as a
+ * component in a {@link LockSpec} record without any additional boilerplate.
  */
-public interface LockableResourceId {
+public interface LockableResourceId extends Lockable {
 
     UUID value();
 
@@ -20,6 +23,12 @@ public interface LockableResourceId {
 
     default String resourceId() {
         return value().toString();
+    }
+
+    /** Returns {@code this}, since a {@code LockableResourceId} is its own lockable identity. */
+    @Override
+    default LockableResourceId getId() {
+        return this;
     }
 
 }

@@ -1,5 +1,6 @@
 package hamburg.engelmann.saga.internal;
 
+import hamburg.engelmann.saga.di.internal.InputResolver;
 import hamburg.engelmann.saga.step.RetryableSagaStep;
 import hamburg.engelmann.saga.step.SagaStep;
 import hamburg.engelmann.saga.step.StepResult;
@@ -20,11 +21,6 @@ public class SagaTransition<I, O, L> {
 
     public SagaTransition(SagaStep<I, O, L> step, InputResolver<I> inputResolver) {
         this(step, inputResolver, null, null);
-    }
-
-    public SagaTransition(SagaStep<I, O, L> step, InputResolver<I> inputResolver,
-                          @Nullable Duration timeout) {
-        this(step, inputResolver, timeout, null);
     }
 
     public SagaTransition(SagaStep<I, O, L> step, InputResolver<I> inputResolver,

@@ -18,6 +18,7 @@ val springBootVersion: String by project
 
 val artifactIds = mapOf(
     "core"           to "saga-core",
+    "di"             to "saga-di",
     "in-memory"      to "saga-engine-in-memory",
     "persistent"     to "saga-engine-persistent",
     "spring-starter" to "saga-spring-starter"

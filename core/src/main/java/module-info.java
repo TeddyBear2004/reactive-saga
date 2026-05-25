@@ -1,4 +1,5 @@
 module hamburg.engelmann.core {
+    requires hamburg.engelmann.saga.di;
     requires reactor.core;
     requires org.slf4j;
     requires static org.jspecify;

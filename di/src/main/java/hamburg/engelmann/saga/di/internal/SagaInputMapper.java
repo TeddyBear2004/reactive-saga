@@ -1,6 +1,4 @@
-package hamburg.engelmann.saga.internal;
-
-import hamburg.engelmann.saga.step.StepResult;
+package hamburg.engelmann.saga.di.internal;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.RecordComponent;
@@ -68,7 +66,8 @@ public class SagaInputMapper {
         if (matches.isEmpty()) {
             String available = history.isEmpty() ? "<no previous steps>"
                     : history.stream().map(c -> {
-                        if (c == StepResult.EmptyOutput.class) return "";
+                        // Use binary name to identify StepResult$EmptyOutput without a compile-time dependency.
+                        if ("hamburg.engelmann.saga.step.StepResult$EmptyOutput".equals(c.getName())) return "";
                         List<String> props = c.isRecord()
                                 ? Arrays.stream(c.getRecordComponents()).map(rc -> rc.getType().getSimpleName() + " " + rc.getName()).toList()
                                 : Arrays.stream(c.getMethods()).filter(m -> m.getParameterCount() == 0 && !m.getName().equals("getClass") && !m.getReturnType().equals(void.class)).map(m -> m.getName() + ": " + m.getReturnType().getSimpleName()).toList();

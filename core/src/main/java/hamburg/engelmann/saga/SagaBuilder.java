@@ -1,7 +1,7 @@
 package hamburg.engelmann.saga;
 
 import hamburg.engelmann.saga.lifecycle.SagaLifecycleObserver;
-import hamburg.engelmann.saga.lock.LockableResourceId;
+import hamburg.engelmann.saga.lock.LockSpec;
 import hamburg.engelmann.saga.lock.SagaLockService;
 import hamburg.engelmann.saga.step.SagaStep;
 import org.jspecify.annotations.Nullable;
@@ -22,8 +22,36 @@ public interface SagaBuilder<I, O> {
 
     SagaBuilder<I, O> withObserver(SagaLifecycleObserver observer);
 
-    /** Configures exclusive resource locking around every {@link Saga#execute} call. */
-    SagaBuilder<I, O> withLock(Function<I, List<LockableResourceId>> resourcesExtractor);
+    /**
+     * Adds exclusive resource locking resolved via the same DI mechanism as step inputs.
+     *
+     * <p>The {@code lockSpecClass} must be an interface or record whose fields/methods can be
+     * mapped from the types available at the point of this call (typically the initial input).
+     * Identical to how step input types are resolved — no extractor function needed.
+     * Can be called multiple times; all resources accumulate.
+     *
+     * <pre>{@code
+     * record OrderLocks(OrderId orderId, UserId userId) implements LockSpec {
+     *     public List<Lockable> lockableResources() { return List.of(orderId, userId); }
+     * }
+     *
+     * Saga.builder("ProcessOrder", CreateOrderInput.class, Receipt.class)
+     *     .withLock(OrderLocks.class)
+     *     ...
+     * }</pre>
+     */
+    SagaBuilder<I, O> withLock(Class<? extends LockSpec> lockSpecClass);
+
+    /**
+     * Adds exclusive resource locking around every {@link Saga#execute} call.
+     *
+     * <p>Can be called multiple times — each call contributes additional resources to lock.
+     * Prefer {@link #withLock(Class)} when the spec can be derived from the available context.
+     *
+     * @param lockSpecExtractor extracts a {@link LockSpec} from the initial input;
+     *                          the spec lists the individual {@link hamburg.engelmann.saga.lock.Lockable} resources to lock
+     */
+    SagaBuilder<I, O> withLock(Function<I, ? extends LockSpec> lockSpecExtractor);
 
     /** Sets the {@link SagaLockService}. Normally injected by a factory — not for direct use. */
     SagaBuilder<I, O> withSagaLockService(@Nullable SagaLockService sagaLockService);

@@ -4,14 +4,21 @@ import hamburg.engelmann.saga.Saga;
 import hamburg.engelmann.saga.SagaBuilder;
 import hamburg.engelmann.saga.SagaPersistenceHook;
 import hamburg.engelmann.saga.SagaStepBuilder;
+import hamburg.engelmann.saga.di.internal.InputResolver;
+import hamburg.engelmann.saga.di.internal.InputResolvers;
+import hamburg.engelmann.saga.di.internal.SagaInputMapper;
+import hamburg.engelmann.saga.di.internal.SagaProxyFactory;
 import hamburg.engelmann.saga.lifecycle.SagaLifecycleObserver;
+import hamburg.engelmann.saga.lock.Lockable;
 import hamburg.engelmann.saga.lock.LockableResourceId;
+import hamburg.engelmann.saga.lock.LockSpec;
 import hamburg.engelmann.saga.lock.SagaLockService;
 import hamburg.engelmann.saga.step.SagaStep;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
 
@@ -31,7 +38,7 @@ public class DefaultSagaBuilder<I, O> implements SagaBuilder<I, O> {
     public DefaultSagaBuilder(String name, List<SagaTransition<?, ?, ?>> transitions,
                                List<Class<?>> outputHistory, Class<O> outputClass,
                                @Nullable SagaLifecycleObserver observer) {
-        this(name, transitions, outputHistory, outputClass, new SagaConfig<>(observer, null, null, null, null, null));
+        this(name, transitions, outputHistory, outputClass, new SagaConfig<>(observer, Collections.emptyList(), null, null, null, null));
     }
 
     private DefaultSagaBuilder(String name, List<SagaTransition<?, ?, ?>> transitions,
@@ -47,34 +54,45 @@ public class DefaultSagaBuilder<I, O> implements SagaBuilder<I, O> {
     /** Bundles all optional saga-level configuration to avoid a 10-parameter constructor. */
     private record SagaConfig<I, O>(
             @Nullable SagaLifecycleObserver observer,
-            @Nullable Function<I, List<LockableResourceId>> lockResourcesExtractor,
+            List<Function<I, ? extends LockSpec>> lockSpecExtractors,
             @Nullable SagaLockService sagaLockService,
             @Nullable Function<I, String> correlationIdExtractor,
             @Nullable SagaPersistenceHook persistenceHook,
             @Nullable Duration sagaTimeout) {
 
         SagaConfig<I, O> withObserver(@Nullable SagaLifecycleObserver obs) {
-            return new SagaConfig<>(obs, lockResourcesExtractor, sagaLockService, correlationIdExtractor, persistenceHook, sagaTimeout);
+            return new SagaConfig<>(obs, lockSpecExtractors, sagaLockService, correlationIdExtractor, persistenceHook, sagaTimeout);
         }
 
-        SagaConfig<I, O> withLock(Function<I, List<LockableResourceId>> extractor) {
-            return new SagaConfig<>(observer, extractor, sagaLockService, correlationIdExtractor, persistenceHook, sagaTimeout);
+        SagaConfig<I, O> addLockSpec(Function<I, ? extends LockSpec> extractor) {
+            List<Function<I, ? extends LockSpec>> updated = new ArrayList<>(lockSpecExtractors);
+            updated.add(extractor);
+            return new SagaConfig<>(observer, Collections.unmodifiableList(updated), sagaLockService, correlationIdExtractor, persistenceHook, sagaTimeout);
         }
 
         SagaConfig<I, O> withSagaLockService(@Nullable SagaLockService svc) {
-            return new SagaConfig<>(observer, lockResourcesExtractor, svc, correlationIdExtractor, persistenceHook, sagaTimeout);
+            return new SagaConfig<>(observer, lockSpecExtractors, svc, correlationIdExtractor, persistenceHook, sagaTimeout);
         }
 
         SagaConfig<I, O> withCorrelationId(Function<I, String> extractor) {
-            return new SagaConfig<>(observer, lockResourcesExtractor, sagaLockService, extractor, persistenceHook, sagaTimeout);
+            return new SagaConfig<>(observer, lockSpecExtractors, sagaLockService, extractor, persistenceHook, sagaTimeout);
         }
 
         SagaConfig<I, O> withPersistenceHook(SagaPersistenceHook hook) {
-            return new SagaConfig<>(observer, lockResourcesExtractor, sagaLockService, correlationIdExtractor, hook, sagaTimeout);
+            return new SagaConfig<>(observer, lockSpecExtractors, sagaLockService, correlationIdExtractor, hook, sagaTimeout);
         }
 
         SagaConfig<I, O> withTimeout(Duration duration) {
-            return new SagaConfig<>(observer, lockResourcesExtractor, sagaLockService, correlationIdExtractor, persistenceHook, duration);
+            return new SagaConfig<>(observer, lockSpecExtractors, sagaLockService, correlationIdExtractor, persistenceHook, duration);
+        }
+
+        /** Merges all lock spec extractors into a single function, or {@code null} if none. */
+        @Nullable Function<I, List<LockableResourceId>> mergedLockExtractor() {
+            if (lockSpecExtractors.isEmpty()) return null;
+            return input -> lockSpecExtractors.stream()
+                    .flatMap(e -> e.apply(input).lockableResources().stream())
+                    .map(Lockable::getId)
+                    .toList();
         }
     }
 
@@ -84,8 +102,19 @@ public class DefaultSagaBuilder<I, O> implements SagaBuilder<I, O> {
     }
 
     @Override
-    public SagaBuilder<I, O> withLock(Function<I, List<LockableResourceId>> resourcesExtractor) {
-        return new DefaultSagaBuilder<>(name, transitions, outputHistory, outputClass, config.withLock(resourcesExtractor));
+    public SagaBuilder<I, O> withLock(Class<? extends LockSpec> lockSpecClass) {
+        return withLockResolved(lockSpecClass);
+    }
+
+    private <S extends LockSpec> SagaBuilder<I, O> withLockResolved(Class<S> lockSpecClass) {
+        InputResolver<S> resolver = createResolver(lockSpecClass, outputHistory);
+        Function<I, LockSpec> fn = input -> resolver.resolve(input, List.of(input));
+        return new DefaultSagaBuilder<>(name, transitions, outputHistory, outputClass, config.addLockSpec(fn));
+    }
+
+    @Override
+    public SagaBuilder<I, O> withLock(Function<I, ? extends LockSpec> lockSpecExtractor) {
+        return new DefaultSagaBuilder<>(name, transitions, outputHistory, outputClass, config.addLockSpec(lockSpecExtractor));
     }
 
     @Override
@@ -160,7 +189,7 @@ public class DefaultSagaBuilder<I, O> implements SagaBuilder<I, O> {
     public Saga<I, O> build() {
         if (transitions.isEmpty()) throw new IllegalStateException("Saga must have at least one step");
         return new SagaImpl<>(name, transitions, outputClass, config.observer(),
-                              createResolver(outputClass, outputHistory), config.lockResourcesExtractor(),
+                              createResolver(outputClass, outputHistory), config.mergedLockExtractor(),
                               config.sagaLockService(), config.correlationIdExtractor(),
                               config.persistenceHook(), config.sagaTimeout());
     }

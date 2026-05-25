@@ -7,6 +7,7 @@ plugins {
 }
 
 dependencies {
+    api(project(":di"))
     api(libs.reactor.core)
     api("org.slf4j:slf4j-api")
     implementation(libs.jspecify)

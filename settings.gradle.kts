@@ -1,4 +1,4 @@
 rootProject.name = "saga"
 
-include("core", "spring-starter")
+include("core", "di", "spring-starter")
 include("engines:in-memory", "engines:persistent")

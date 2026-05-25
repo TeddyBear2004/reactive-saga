@@ -6,7 +6,7 @@ import hamburg.engelmann.saga.SagaEngine;
 import hamburg.engelmann.saga.SagaPersistenceHook;
 import hamburg.engelmann.saga.SagaStepBuilder;
 import hamburg.engelmann.saga.lifecycle.SagaLifecycleObserver;
-import hamburg.engelmann.saga.lock.LockableResourceId;
+import hamburg.engelmann.saga.lock.LockSpec;
 import hamburg.engelmann.saga.lock.SagaLockService;
 import hamburg.engelmann.saga.step.SagaStep;
 import org.jspecify.annotations.Nullable;
@@ -57,8 +57,13 @@ class DefaultSagaStepBuilder<I, O> implements SagaStepBuilder<I, O> {
     }
 
     @Override
-    public SagaBuilder<I, O> withLock(Function<I, List<LockableResourceId>> resourcesExtractor) {
-        return inner.withLock(resourcesExtractor);
+    public SagaBuilder<I, O> withLock(Class<? extends LockSpec> lockSpecClass) {
+        return inner.withLock(lockSpecClass);
+    }
+
+    @Override
+    public SagaBuilder<I, O> withLock(Function<I, ? extends LockSpec> lockSpecExtractor) {
+        return inner.withLock(lockSpecExtractor);
     }
 
     @Override

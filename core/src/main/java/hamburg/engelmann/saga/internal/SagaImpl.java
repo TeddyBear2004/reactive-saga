@@ -1,5 +1,6 @@
 package hamburg.engelmann.saga.internal;
 
+import hamburg.engelmann.saga.di.internal.InputResolver;
 import hamburg.engelmann.saga.Saga;
 import hamburg.engelmann.saga.SagaPersistenceHook;
 import hamburg.engelmann.saga.lifecycle.SagaLifecycleObserver;

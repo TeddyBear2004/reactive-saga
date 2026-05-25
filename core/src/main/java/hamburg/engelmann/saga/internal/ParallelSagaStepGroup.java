@@ -1,5 +1,6 @@
 package hamburg.engelmann.saga.internal;
 
+import hamburg.engelmann.saga.di.internal.InputResolver;
 import hamburg.engelmann.saga.step.SagaStep;
 import hamburg.engelmann.saga.step.StepResult;
 import org.slf4j.Logger;

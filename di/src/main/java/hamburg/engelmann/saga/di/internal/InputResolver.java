@@ -1,4 +1,4 @@
-package hamburg.engelmann.saga.internal;
+package hamburg.engelmann.saga.di.internal;
 
 import java.util.List;
 
